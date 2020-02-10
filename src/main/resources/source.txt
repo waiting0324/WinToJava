@@ -1,0 +1,20 @@
+string ls_cargo_location, ls_register_no, ls_effect_date, ls_payment_type, ls_inc_id
+string ls_short_name, ls_bank_id, ls_tran_date_s, ls_tran_date_e, ls_start_date, ls_end_date  
+string ls_fee_start_date, ls_fee_end_date, ls_tr_rcv
+string ls_ar_type, ls_close_flag,ls_custom_flag, ls_auto, ls_mibc_bank_id, ls_virtual_account, ls_check_sum_id
+
+ls_cargo_location  = trim(dw_criteria_1.cargo_location)
+ls_register_no     = trim(dw_criteria_1.custom_id)
+ls_bank_id         = trim(dw_criteria_1.bank_id)
+ls_tran_date_s     = trim(dw_criteria_1.start_date) 
+ls_tran_date_e     = trim(dw_criteria_1.end_date)
+ls_fee_start_date  = trim(dw_criteria_1.ls_fee_start_date) 
+ls_fee_end_date    = trim(dw_criteria_1.ls_fee_end_date) 
+ls_ar_type         = trim(dw_criteria_1.ar_type)
+ls_close_flag      = trim(dw_criteria_1.close_flag) 
+ls_custom_flag     = trim(dw_criteria_1.custom_flag) 
+ls_tr_rcv          = trim(dw_criteria_1.ls_tr_rcv)
+ls_auto            = trim(dw_criteria_1.ls_auto)
+ls_mibc_bank_id    = trim(dw_criteria_1.mibc_bank_id)
+ls_virtual_account = trim(dw_criteria_1.virtual_account)
+ls_check_sum_id    = trim(dw_criteria_1.check_sum_id)
