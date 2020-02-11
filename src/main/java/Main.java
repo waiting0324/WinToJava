@@ -1,4 +1,3 @@
-import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 
@@ -25,17 +24,12 @@ public class Main {
             if (line == null) break;
             if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
 
-            // 聲明LIST加註釋
+            // 聲明List加註釋
             if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) line = "// " + line;
 
-            // 命名轉換
-            // string ls_cargo_location, ls_register_no → String ls_cargo_location = null, ls_register_no = null;
-            if (trimLine.startsWith("string")) {
-                line = doString(line);
-            }
-            // integer li_i, li_j → igDecimal li_i = BigDecimal.ZERO, li_j = BigDecimal.ZERO;
-            if (trimLine.startsWith("integer")) {
-                line = doInteger(line);
+            // 變量聲明
+            if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
+                line = doVariDecl(line);
             }
 
             if (StrUtil.startWith(line, "ls_")) {
@@ -48,6 +42,7 @@ public class Main {
                 }
             }
 
+            // 條件語句
             if (trimLine.startsWith("if")) {
                 line = doIf(line);
             }
@@ -71,15 +66,55 @@ public class Main {
         System.out.println(result);
     }
 
+    // 變量聲明
+    private static String doVariDecl(String line) {
+
+        if (line.trim().startsWith("string")) {
+            line = doString(line);
+        } else if (line.trim().startsWith("integer")) {
+            line = doNum(line, "integer");
+        } else if (line.trim().startsWith("long")) {
+            line = doNum(line, "long");
+        } else if (line.trim().startsWith("datetime")) {
+            line = doDateTime(line);
+        }
+
+        return line;
+    }
+
+    private static String doDateTime(String line) {
+        return line.replace("datetime", "Timestamp");
+    }
+
     // 處理SQL查詢語句
     static String doSelect(String line, BufferedReader reader) throws IOException {
 
+        // :參數
         Set<String> params  = new LinkedHashSet();
+        // 數據表
+        String[] tables = new String[10];
+        // 請求查詢的欄位
+        List<String> selecColumns = new ArrayList<>();
+        // FROM 關鍵字是否出現
+        boolean isFromAppear = false;
+
 
         StringBuilder oriSql = new StringBuilder();
-        oriSql.append(line);
+        // 首句尾巴加上 " +
+        oriSql.append(line + " \" \u002B \n");
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.trim();
+
+            // 取得數據表
+            if (StrUtil.startWithIgnoreCase(line, "FROM")) {
+                tables = StrUtil.subAfter(line, "FROM", false).split(",");
+                StrUtil.trim(tables);
+            }
+
+            // 取得查詢欄位
+            if (!isFromAppear) {
+
+            }
 
             // 空格格式化
             if (StrUtil.startWithIgnoreCase(line, "FROM")) line = "   " + line;
@@ -98,14 +133,24 @@ public class Main {
 
         // 參數增加空格
         String result = oriSql.toString().replace("(:", "( :");
+
+
+        // 去除尾部 +號 並增加 ；號
         result = "sql = \"" +  StrUtil.subBefore(result, " + ", true) + ";\n";
 
+        // 請求參數映射
         if (params.size() != 0) {
             result += "param = new HashMap(); \n";
             for (String param : params) {
                 result = result + "param.put(\"" + param + "\", " + param + ");\n";
             }
         }
+
+        // 增加持久層查詢語句
+        String table = tables[0];
+        table = StrUtil.toCamelCase(table);
+        table = "resDecMap = " + table + "Respository.findByNativeSql(sql, param)";
+        result += table;
 
         return result;
     }
@@ -157,8 +202,9 @@ public class Main {
         return line;
     }
 
-    static String doInteger(String line) {
-        line = StrUtil.replace(line, "integer", "BigDecimal");
+    // integer li_i, li_j → igDecimal li_i = BigDecimal.ZERO, li_j = BigDecimal.ZERO;
+    static String doNum(String line, String type) {
+        line = "BigDecimal " + StrUtil.subAfter(line, type, false).trim();
         String[] split = StrUtil.split(line, ",");
         StrUtil.trim(split);
         String[] strings = StrUtil.wrapAll("", " = BigDecimal.ZERO", split);
@@ -166,8 +212,9 @@ public class Main {
         return line;
     }
 
+    // string ls_cargo_location, ls_register_no → String ls_cargo_location = null, ls_register_no = null;
     static String doString(String line) {
-        line = StrUtil.replace(line, "string", "String");
+        line = "String " + StrUtil.subAfter(line, "string", false).trim();
         String[] split = StrUtil.split(line, ",");
         StrUtil.trim(split);
         String[] strings = StrUtil.wrapAll("", " = null", split);
