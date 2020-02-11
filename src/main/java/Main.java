@@ -1,11 +1,7 @@
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -13,6 +9,8 @@ import java.util.List;
  * Create By Waiting on 2020/2/10
  */
 public class Main {
+
+
     public static void main(String[] args) throws Exception {
 
         StringBuilder result = new StringBuilder();
@@ -24,6 +22,7 @@ public class Main {
             String trimLine = StrUtil.trimToEmpty(line);
 
             if (line == null) break;
+            if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
 
             // 命名轉換
             // string ls_cargo_location, ls_register_no → String ls_cargo_location = null, ls_register_no = null;
@@ -55,66 +54,7 @@ public class Main {
             }
 
             if (trimLine.startsWith("if")) {
-                boolean isFalse = false;
-                String afterLine = StrUtil.subAfter(trimLine, "if", false).trim();
-                String firstStr = StrUtil.subBefore(afterLine, " ", false);
-                // if isnull(ls_register_no) then ls_register_no  = ''
-                if (afterLine.startsWith("isnull")) {
-                    line = line.replace("isnull", "").replace("then", "").replace("\'", "\"").trim();
-                    String[] split = line.split("\\)");
-                    line = split[0] + " == null)" + split[1];
-                }
-
-                if (firstStr.equals("not"))  {
-                    isFalse = true;
-                }
-
-                // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
-                // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
-                if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
-
-                    // 處理條件判斷式
-                    String condi = StrUtil.subBetween(trimLine, "if", "="); // 條件判斷式
-                    condi = doLenTrim(condi);
-
-                    // 關鍵字轉換
-                    line = line.replace("=", "==")
-                            .replace("then", "").replace("\'", "\"");
-
-                    Integer number = ReUtil.getFirstNumber(line);
-
-                    // 拼接結果
-                    line = StrUtil.indexedFormat("if ({0} == {1}) {2}", condi, number, StrUtil.subAfter(line,number+"", true));
-                }
-
-              /*  if len(trim(ls_tran_date_s)) = 0 and
-                len(trim(ls_tran_date_e)) = 0 and
-                len(trim(ls_fee_start_date)) = 0
-                and len(trim(ls_fee_end_date)) = 0 then*/
-                /*if (afterLine.startsWith("len")) {
-
-                    List<String> params = new ArrayList<>();
-                    // 取出if上半部
-                    while (!line.contains("then")) {
-                        line = line + "\n" + reader.readLine();
-                        if (line.contains("then")) break;
-                    }
-
-                    String[] split = line.split(" ");
-
-                    for (String s : split) {
-                        if (StrUtil.isWrap(s, "len(", ")") || StrUtil.isWrap(s, "trim(", ")")) {
-                            s = StrUtil.unWrap(s, "len(", ")");
-                            s = StrUtil.unWrap(s, "trim(", ")");
-                            params.add(s);
-                        }
-                    }
-
-                    System.out.println(params);
-                }
-*/
-
-
+                line = doIf(line);
             }
             // 加上句號
             if (!"".equals(line)) result.append(line + ";");
@@ -127,9 +67,59 @@ public class Main {
         System.out.println(result);
     }
 
+
+    static String doIf(String line) {
+
+        String trimLine = StrUtil.trimToEmpty(line);
+        boolean isFalse = false;
+        String afterLine = StrUtil.subAfter(trimLine, "if", false).trim(); // if後的全部字串
+        String firstStr = StrUtil.subBefore(afterLine, " ", false); // if後的第一個關鍵字
+        String condi = StrUtil.subBetween(line, "if", "then").trim(); //條件判斷式
+        String func = StrUtil.subAfter(afterLine, "then", false); // 執行語句
+
+
+        // if isnull(ls_register_no) then ls_register_no  = ''
+        if (condi.startsWith("isnull")) {
+
+            // ls_register_no
+            String param = StrUtil.unWrap(condi, "isnull(", ")");
+
+            // 關鍵字轉換
+            func = func.replace("\'", "\"").replace("0", "BigDecimal.ZERO");
+
+            // 轉換結果
+            line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func);
+        }
+
+        if (firstStr.equals("not"))  {
+            isFalse = true;
+        }
+
+        // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+        // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
+        if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
+
+            // 處理條件判斷式
+            String condiLeft = StrUtil.subBefore(condi, "=", false).trim();; // 條件判斷式左側
+            condiLeft = tranIfLenTrimParas(condiLeft);
+
+            // 關鍵字轉換
+            func = func.replace("\'", "\"");
+
+            Integer number = ReUtil.getFirstNumber(line);
+
+            // 拼接結果
+            line = StrUtil.indexedFormat("if ({0} == {1}) {2}", condiLeft, number, func);
+        }
+        return line;
+    }
+
+
+
+    // 翻譯 if語句字串長度參數
     // len(trim(arg_bank_id)) + len(trim(arg_user_id)) - len(trim(arg_user_id))
     // → StringUtils.trimToEmpty(arg_bank_id).length() + StringUtils.trimToEmpty(arg_user_id).length() - StringUtils.trimToEmpty(arg_user_id).length()
-    private static String doLenTrim(String source) {
+    static String tranIfLenTrimParas(String source) {
 
         LinkedList<String> params = new LinkedList<>();
         LinkedList<String> operaters = new LinkedList<>();
@@ -137,7 +127,7 @@ public class Main {
         source = source.trim();
 
         String[] splits = source.split(" ");
-        if (splits.length == 1) { // 簡單類型
+        if (splits.length == 1) { // 簡單類型，沒有運算符 len(trim(arg_bank_id))
             String param = StrUtil.unWrap(source, "len(", ")");
             if (StrUtil.isWrap(param, "trim(", ")")) {
                 param = StrUtil.unWrap(param, "trim(", ")");
