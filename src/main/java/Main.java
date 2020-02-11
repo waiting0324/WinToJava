@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -64,28 +65,26 @@ public class Main {
                     line = split[0] + " == null)" + split[1];
                 }
 
-                // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
                 if (firstStr.equals("not"))  {
                     isFalse = true;
                 }
+
+                // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+                // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
                 if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
-                    // 取得參數並包裹
-                    String param = StrUtil.unWrap(firstStr, "len(", ")");
-                    if (StrUtil.isWrap(param, "trim(", ")")) {
-                        param = StrUtil.unWrap(param, "trim(", ")");
-                        param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
-                    }
-                    param += ".length()"; // param: StringUtils.trimToEmpty(arg_bank_id).length()
+
+                    // 處理條件判斷式
+                    String condi = StrUtil.subBetween(trimLine, "if", "="); // 條件判斷式
+                    condi = doLenTrim(condi);
 
                     // 關鍵字轉換
-                    line = line.replace(firstStr, param).replace("=", "==")
+                    line = line.replace("=", "==")
                             .replace("then", "").replace("\'", "\"");
 
                     Integer number = ReUtil.getFirstNumber(line);
 
                     // 拼接結果
-                    line = StrUtil.indexedFormat("if ({0} == {1}) {2}", param, number, StrUtil.subAfter(line,number+"", true));
-
+                    line = StrUtil.indexedFormat("if ({0} == {1}) {2}", condi, number, StrUtil.subAfter(line,number+"", true));
                 }
 
               /*  if len(trim(ls_tran_date_s)) = 0 and
@@ -117,10 +116,6 @@ public class Main {
 
 
             }
-
-
-
-
             // 加上句號
             if (!"".equals(line)) result.append(line + ";");
             result.append("\n");
@@ -130,5 +125,50 @@ public class Main {
 
         System.out.println("===============================");
         System.out.println(result);
+    }
+
+    // len(trim(arg_bank_id)) + len(trim(arg_user_id)) - len(trim(arg_user_id))
+    // → StringUtils.trimToEmpty(arg_bank_id).length() + StringUtils.trimToEmpty(arg_user_id).length() - StringUtils.trimToEmpty(arg_user_id).length()
+    private static String doLenTrim(String source) {
+
+        LinkedList<String> params = new LinkedList<>();
+        LinkedList<String> operaters = new LinkedList<>();
+
+        source = source.trim();
+
+        String[] splits = source.split(" ");
+        if (splits.length == 1) { // 簡單類型
+            String param = StrUtil.unWrap(source, "len(", ")");
+            if (StrUtil.isWrap(param, "trim(", ")")) {
+                param = StrUtil.unWrap(param, "trim(", ")");
+                param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
+            }
+            param += ".length()"; // param: StringUtils.trimToEmpty(arg_bank_id).length()
+            params.add(param);
+        } else {
+            for (String param : splits) {
+                if (StrUtil.isWrap(param, "len(", ")")) {
+                    param = StrUtil.unWrap(param, "len(", ")");
+                    if (StrUtil.isWrap(param, "trim(", ")")) {
+                        param = StrUtil.unWrap(param, "trim(", ")");
+                        param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
+                    }
+                    param += ".length()"; // param: StringUtils.trimToEmpty(arg_bank_id).length()
+                    params.add(param);
+
+                } else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")){
+                    operaters.add(param.trim());
+                }
+            }
+
+        }
+
+        String result = "";
+
+        while (params.size() != 0) {
+            result += params.pop();
+            if (operaters.size() != 0) result = result + " " + operaters.pop() + " ";
+        }
+        return result;
     }
 }

@@ -8,6 +8,6 @@ if isnull(arg_bank_id) then arg_bank_id = ''
 if isnull(arg_user_id) then arg_user_id = ''
 if len(trim(arg_bank_id)) = 0 then return 'Fail'
 if len(trim(arg_user_id)) = 0 then return 'Fail'
-if not len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
 if isnull(arg_amt) then arg_amt = 0
 
