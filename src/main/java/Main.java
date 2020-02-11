@@ -1,9 +1,9 @@
+import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.*;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Create By Waiting on 2020/2/10
@@ -21,26 +21,21 @@ public class Main {
             String line = reader.readLine();
             String trimLine = StrUtil.trimToEmpty(line);
 
+            // 到最後或是註解則略過
             if (line == null) break;
             if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
+
+            // 聲明LIST加註釋
+            if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) line = "// " + line;
 
             // 命名轉換
             // string ls_cargo_location, ls_register_no → String ls_cargo_location = null, ls_register_no = null;
             if (trimLine.startsWith("string")) {
-                line = StrUtil.replace(line, "string", "String");
-                String[] split = StrUtil.split(line, ",");
-                StrUtil.trim(split);
-                String[] strings = StrUtil.wrapAll("", " = null", split);
-                line = StrUtil.join(", ", strings);
+                line = doString(line);
             }
-
             // integer li_i, li_j → igDecimal li_i = BigDecimal.ZERO, li_j = BigDecimal.ZERO;
             if (trimLine.startsWith("integer")) {
-                line = StrUtil.replace(line, "integer", "BigDecimal");
-                String[] split = StrUtil.split(line, ",");
-                StrUtil.trim(split);
-                String[] strings = StrUtil.wrapAll("", " = BigDecimal.ZERO", split);
-                line = StrUtil.join(", ", strings);
+                line = doInteger(line);
             }
 
             if (StrUtil.startWith(line, "ls_")) {
@@ -56,8 +51,17 @@ public class Main {
             if (trimLine.startsWith("if")) {
                 line = doIf(line);
             }
+
+            // 查詢語句
+            if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
+                line = doSelect(line, reader);
+            }
+
+
+
+
             // 加上句號
-            if (!"".equals(line)) result.append(line + ";");
+            if (!"".equals(line) && !line.endsWith(";")) result.append(line + ";");
             result.append("\n");
         }
 
@@ -65,6 +69,45 @@ public class Main {
 
         System.out.println("===============================");
         System.out.println(result);
+    }
+
+    // 處理SQL查詢語句
+    static String doSelect(String line, BufferedReader reader) throws IOException {
+
+        Set<String> params  = new LinkedHashSet();
+
+        StringBuilder oriSql = new StringBuilder();
+        oriSql.append(line);
+        while (!StrUtil.contains(line = reader.readLine(), ";")) {
+            line = line.trim();
+
+            // 空格格式化
+            if (StrUtil.startWithIgnoreCase(line, "FROM")) line = "   " + line;
+            else if (StrUtil.startWithIgnoreCase(line, "WHERE")) line = " " + line;
+            else if (StrUtil.startWithIgnoreCase(line, "AND")) line = "   " + line;
+            else if (StrUtil.startWithIgnoreCase(line, "ORDER")) line = " " + line;
+            else line = " " + line;
+
+            // 處理 :param 變量
+            String param = StrUtil.subBetween(line, ":", ",");
+            if (param != null) params.add(param);
+
+            // 尾部增加+號
+            oriSql.append("\" " + line + "  \" \u002B \n");
+        }
+
+        // 參數增加空格
+        String result = oriSql.toString().replace("(:", "( :");
+        result = "sql = \"" +  StrUtil.subBefore(result, " + ", true) + ";\n";
+
+        if (params.size() != 0) {
+            result += "param = new HashMap(); \n";
+            for (String param : params) {
+                result = result + "param.put(\"" + param + "\", " + param + ");\n";
+            }
+        }
+
+        return result;
     }
 
 
@@ -114,6 +157,23 @@ public class Main {
         return line;
     }
 
+    static String doInteger(String line) {
+        line = StrUtil.replace(line, "integer", "BigDecimal");
+        String[] split = StrUtil.split(line, ",");
+        StrUtil.trim(split);
+        String[] strings = StrUtil.wrapAll("", " = BigDecimal.ZERO", split);
+        line = StrUtil.join(", ", strings);
+        return line;
+    }
+
+    static String doString(String line) {
+        line = StrUtil.replace(line, "string", "String");
+        String[] split = StrUtil.split(line, ",");
+        StrUtil.trim(split);
+        String[] strings = StrUtil.wrapAll("", " = null", split);
+        line = StrUtil.join(", ", strings);
+        return line;
+    }
 
 
     // 翻譯 if語句字串長度參數

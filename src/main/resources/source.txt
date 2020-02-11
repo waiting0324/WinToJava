@@ -1,13 +1,30 @@
 Str f_micb_chk_sum_generator (string arg_bank_id, string arg_user_id, long arg_amt)
 // 兆豐銀行客戶虛擬帳號檢核碼產生器
-string  ls_valid_account, ls_id, ls_amt
-integer li_i, li_j, li_value, li_remainder
-integer li_value1, li_value2, li_value3, li_value4
+// string  ls_valid_account, ls_id, ls_amt
+// integer li_i, li_j, li_value, li_remainder
+// integer li_value1, li_value2, li_value3, li_value4
 
-if isnull(arg_bank_id) then arg_bank_id = ''
-if isnull(arg_user_id) then arg_user_id = ''
-if len(trim(arg_bank_id)) = 0 then return 'Fail'
-if len(trim(arg_user_id)) = 0 then return 'Fail'
-if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
-if isnull(arg_amt) then arg_amt = 0
+// if isnull(arg_bank_id) then arg_bank_id = ''
+// if isnull(arg_user_id) then arg_user_id = ''
+// if len(trim(arg_bank_id)) = 0 then return 'Fail'
+// if len(trim(arg_user_id)) = 0 then return 'Fail'
+// if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+// if isnull(arg_amt) then arg_amt = 0
 
+// 用虛擬帳號找出基本資料設定之記帳客編
+DECLARE CUST_VIRTUAL_ACCOUNT CURSOR FOR
+SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
+       CUST_VIRTUAL_ACCOUNT.REGISTER_NO,
+       ACCT_MAP.ACCT_NO
+  FROM CUST_VIRTUAL_ACCOUNT, ACCT_MAP
+ WHERE CUST_VIRTUAL_ACCOUNT.BANK_ID        = substr(:ls_virtual_account,1,4)
+   AND CUST_VIRTUAL_ACCOUNT.USER_ID        = substr(:ls_virtual_account22,5,9)
+   AND CUST_VIRTUAL_ACCOUNT.CHECK_SUM_ID   = substr(:ls_virtual_account33,14,1)
+   AND NVL(CUST_VIRTUAL_ACCOUNT.REGISTER_NO,'CASH') <> 'CASH'
+   AND CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION = ACCT_MAP.CARGO_LOCATION
+   AND '138'                               = ACCT_MAP.CHARGE_TYPE
+ORDER BY CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
+         CUST_VIRTUAL_ACCOUNT.REGISTER_NO
+     ;
+// if len(trim(arg_user_id)) = 0 then return 'Fail'
+// if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
