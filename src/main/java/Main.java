@@ -1,7 +1,9 @@
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -24,49 +26,102 @@ public class Main {
 
             // 到最後或是註解則略過
             if (line == null) break;
-            if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
+            else if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
 
             // 聲明List加註釋
-            if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) line = "// " + line;
+            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) line = "// " + line;
 
             // 變量聲明
-            if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
+            else if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
                 line = doVariDecl(line);
             }
 
-            if (StrUtil.startWith(line, "ls_")) {
-                List<String> blocks = StrUtil.splitTrim(line, "=");
-                // trim 關鍵字轉換  ls_cargo_location  = trim(dw_criteria_1.cargo_location) → ls_cargo_location = StringUtils.trim(dw_criteria_1.getCargoLocation());
-                if (StrUtil.isWrap(blocks.get(1), "trim(", ")")) {
-                    String content = StrUtil.unWrap(blocks.get(1), "trim(", ")");
-                    content = content.split("\\.")[0] + "." + StrUtil.genGetter(StrUtil.toCamelCase(content.split("\\.")[1])) + "()";
-                    line = blocks.get(0) + " = StringUtils.trimToEmpty(" + content + ")";
-                }
+            // 參數賦值
+            else if (StrUtil.startWithAny(line, "ls_", "li_", "ll_")) {
+                line = doAsignParam(line);
             }
 
             // 條件語句
-            if (trimLine.startsWith("if")) {
+            else if (trimLine.startsWith("if")) {
                 line = doIf(line);
             }
 
             // 查詢語句
-            if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
+            else if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
                 line = doSelect(line, reader);
                 isSql = true;
             }
 
+            // 函數聲明
+            else if (StrUtil.startWithAny(trimLine, "Str", "json")) {
+                line = doFuncDecl(line);
+            }
 
-            result.append(line);
 
-            // 加上句號
-            if (!"".equals(line) && !line.endsWith(";") && !isSql) result.append(";");
-            result.append("\n");
+            // 加上換行
+            result.append(line + "\n");
         }
-
 
 
         System.out.println("===============================");
         System.out.println(result);
+    }
+
+    // 參數賦值
+    private static String doAsignParam(String line) {
+        String param = line.split("=")[0].trim();
+        String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
+        String comment = StrUtil.subAfter(line, "//", true);
+
+        // 單純賦值為0  ll_non_rcv_cnt = 0
+        if ("0".equals(func)) {
+            func = "BigDecimal.ZERO";
+        }
+        // 單純賦值字串  ls_ar_type = '008'
+        else if (StrUtil.isWrap(func, "\'")) {
+            func = func.replace("\'", "\"");
+        }
+        // TODO 簡單加減計算  ll_ar_amt - ll_ar_recv_amt
+        else if (StrUtil.count(func, "-") == 1 || StrUtil.count(func, "+") == 1) {
+            String operator = "";
+            if (func.contains("-")) {
+                operator = "sub";
+            } else if (func.contains("+")) {
+                operator = "add";
+            }
+            func = StrUtil.format("{} = {};" , param, func);
+        }
+
+
+        // 有注釋
+        if (!"".equals(comment)) {
+            return StrUtil.format("{} = {}; //{}" , param, func, comment);
+        }
+        // 沒有注釋
+        else {
+            return StrUtil.format("{} = {};" , param, func);
+        }
+
+    }
+
+    // 函數聲明
+    private static String doFuncDecl(String line) {
+
+        // 駝峰函數名
+        String funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, " ", "(").trim());
+        // 參數字串
+        String paramStr = StrUtil.subBetween(line, "(", ")");
+        // 參數關鍵字取代
+        paramStr = paramStr.replace("string", "String").replace("str", "String").replace("long", "BigDecimal");
+
+        String result = StrUtil.format("@Override\npublic TransactionData {} ({}) {\n", funcName, paramStr);
+
+        // 常用變量聲明
+        result += "String sql;\n";
+        result += "Map<String, String> resStrMap;\n";
+        result += "Map<String, BigDecimal> resDecMap;\n";
+
+        return result;
     }
 
     // 變量聲明
@@ -82,9 +137,10 @@ public class Main {
             line = doDateTime(line);
         }
 
-        return line;
+        return line + ";";
     }
 
+    // 處理datetime類型聲明
     private static String doDateTime(String line) {
         return line.replace("datetime", "Timestamp");
     }
@@ -185,7 +241,7 @@ public class Main {
         return result;
     }
 
-
+    // 處理if條件判斷式
     static String doIf(String line) {
 
         String trimLine = StrUtil.trimToEmpty(line);
@@ -206,7 +262,7 @@ public class Main {
             func = func.replace("\'", "\"").replace("0", "BigDecimal.ZERO");
 
             // 轉換結果
-            line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func);
+            line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
         }
 
         if (firstStr.equals("not"))  {
@@ -227,7 +283,7 @@ public class Main {
             Integer number = ReUtil.getFirstNumber(line);
 
             // 拼接結果
-            line = StrUtil.indexedFormat("if ({0} == {1}) {2}", condiLeft, number, func);
+            line = StrUtil.indexedFormat("if ({0} == {1}) {2};", condiLeft, number, func);
         }
         return line;
     }
