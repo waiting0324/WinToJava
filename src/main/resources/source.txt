@@ -26,10 +26,10 @@ SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
 ORDER BY CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
          CUST_VIRTUAL_ACCOUNT.REGISTER_NO
      ;
-string  ls_virtual_account, ls_cargo_location, ls_register_no, ls_start_date, ls_end_date, ls_payment_type, ls_ar_item
-string  ls_pay_str, ls_bank_acct_no, ls_cust_attr, ls_acct_no, ls_ar_type, ls_auto_write, ls_err_text
-string  ls_credit_no, ls_used_cust_id, ls_memo, ls_seq, ls_temp, ls_post, ls_desc
-long    ll_amt, ll_ar_amt, ll_ar_recv_amt, ll_pay_amt, ll_milus_amt, ll_non_rcv_cnt, ll_counter
-long    ll_b_vol1, ll_b_vol2, ll_b_vol3
-integer li_cnt, li_register_cnt, li_credit
-datetime ldt_now, l_dt
+// string  ls_virtual_account, ls_cargo_location, ls_register_no, ls_start_date, ls_end_date, ls_payment_type, ls_ar_item
+// string  ls_pay_str, ls_bank_acct_no, ls_cust_attr, ls_acct_no, ls_ar_type, ls_auto_write, ls_err_text
+// string  ls_credit_no, ls_used_cust_id, ls_memo, ls_seq, ls_temp, ls_post, ls_desc
+// long    ll_amt, ll_ar_amt, ll_ar_recv_amt, ll_pay_amt, ll_milus_amt, ll_non_rcv_cnt, ll_counter
+// long    ll_b_vol1, ll_b_vol2, ll_b_vol3
+// integer li_cnt, li_register_cnt, li_credit
+// datetime ldt_now, l_dt

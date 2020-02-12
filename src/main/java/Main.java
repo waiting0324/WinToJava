@@ -16,9 +16,11 @@ public class Main {
         InputStream is = new FileInputStream(Main.class.getClassLoader().getResource("source.txt").getPath());
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         while (true) {
-            //String line = StrUtil.trim(reader.readLine());
             String line = reader.readLine();
             String trimLine = StrUtil.trimToEmpty(line);
+
+            // 是否為處理SQL
+            boolean isSql = false;
 
             // 到最後或是註解則略過
             if (line == null) break;
@@ -50,13 +52,14 @@ public class Main {
             // 查詢語句
             if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
                 line = doSelect(line, reader);
+                isSql = true;
             }
 
 
-
+            result.append(line);
 
             // 加上句號
-            if (!"".equals(line) && !line.endsWith(";")) result.append(line + ";");
+            if (!"".equals(line) && !line.endsWith(";") && !isSql) result.append(";");
             result.append("\n");
         }
 
@@ -98,10 +101,17 @@ public class Main {
         // FROM 關鍵字是否出現
         boolean isFromAppear = false;
 
-
+        // SQL 語句
         StringBuilder oriSql = new StringBuilder();
+
+        // 首句取得查詢欄位
+        String firstSelectColumn = StrUtil.subAfter(line, ".", false).replace(",", "");
+        selecColumns.add(firstSelectColumn);
+        // 首句增加查詢欄位別名
+        line = StrUtil.subBefore(line, ",", true) + " " + firstSelectColumn + ",";
         // 首句尾巴加上 " +
         oriSql.append(line + " \" \u002B \n");
+
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.trim();
 
@@ -112,8 +122,17 @@ public class Main {
             }
 
             // 取得查詢欄位
+            if (StrUtil.containsIgnoreCase(line, "FROM")) isFromAppear = true;
             if (!isFromAppear) {
-
+                String selectColumn = StrUtil.subAfter(line, ".", false);
+                if (selectColumn.contains(",")) selectColumn = selectColumn.replace(",", "");
+                selecColumns.add(selectColumn);
+                // 增加查詢欄位別名
+                if (line.trim().endsWith(",")) {
+                    line = StrUtil.subBefore(line, ",", true) + " " + selectColumn + ",";
+                } else {
+                    line = line + " " + selectColumn;
+                }
             }
 
             // 空格格式化
@@ -146,11 +165,22 @@ public class Main {
             }
         }
 
+        result += "\n";
+
         // 增加持久層查詢語句
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resDecMap = " + table + "Respository.findByNativeSql(sql, param)";
+        table = "resStrMap = (Map<String, String>) " + table + "Respository.findMapByNativeSql(sql, param);\n";
         result += table;
+
+        // 查詢結果封裝
+        // ls_temp = resStrMap.get("LS_TEMP");
+        for (String selecColumn : selecColumns) {
+            // 全大寫轉小寫
+            String lowerSelecColumn = "";
+            if (StrUtil.isUpperCase(selecColumn)) lowerSelecColumn = StrUtil.swapCase(selecColumn);
+            result = result + "ls_" + lowerSelecColumn + " = resStrMap.get(\"" + selecColumn + "\");\n";
+        }
 
         return result;
     }
