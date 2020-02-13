@@ -1,10 +1,7 @@
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
-import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -157,66 +154,17 @@ public class Main {
         return line.replace("datetime", "Timestamp");
     }
 
-    // 處理SQL查詢語句
-    static String doSelect(String line, BufferedReader reader) throws IOException {
-
-        // :參數
-        Set<String> params  = new LinkedHashSet();
-        // 數據表
-        String[] tables = new String[10];
-        // 請求查詢的欄位
-        List<String> selecColumns = new ArrayList<>();
-        // FROM 關鍵字是否出現
-        boolean isFromAppear = false;
+    // 取得格式化過後的SQL語句
+    private static String getOriSql(String line, BufferedReader reader) throws IOException {
 
         // SQL 語句
         StringBuilder oriSql = new StringBuilder();
 
-        // 首句取得查詢欄位
-        String firstSelectColumn = StrUtil.subAfter(line, ".", false).replace(",", "");
-        selecColumns.add(firstSelectColumn);
-        // 首句增加查詢欄位別名
-        line = StrUtil.subBefore(line, ",", true) + " " + firstSelectColumn + ",";
         // 首句尾巴加上 " +
         oriSql.append(line + " \" \u002B \n");
 
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.trim();
-
-            // 取得查詢欄位
-            if (StrUtil.containsIgnoreCase(line, "FROM")) {
-                isFromAppear = true;
-            }
-            if (!isFromAppear) {
-                // 此種格式的SQL查詢 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
-                if (line.contains(".")) {
-                    String selectColumn = StrUtil.subAfter(line, ".", false);
-                    if (selectColumn.contains(",")) {
-                        selectColumn = selectColumn.replace(",", "");
-                    }
-                    selecColumns.add(selectColumn);
-                    // 增加查詢欄位別名
-                    if (line.trim().endsWith(",")) {
-                        line = StrUtil.subBefore(line, ",", true) + " " + selectColumn + ",";
-                    } else {
-                        line = line + " " + selectColumn;
-                    }
-                }
-                // 此種格式的SQL查詢 select custom_id into :ls_custom_id
-                else {
-                    /*reader.
-                    while (line += reader.readLine()) {
-
-                    }*/
-                }
-
-            }
-
-            // 取得數據表
-            if (StrUtil.startWithIgnoreCase(line, "FROM")) {
-                tables = StrUtil.subAfter(line, "FROM", false).split(",");
-                StrUtil.trim(tables);
-            }
 
             // 空格格式化
             if (StrUtil.startWithIgnoreCase(line, "FROM")) {
@@ -231,26 +179,170 @@ public class Main {
                 line = " " + line;
             }
 
-            // 處理 :param 變量
-            String param = StrUtil.subBetween(line, ":", ",");
-            if (param != null) {
-                params.add(param);
-            }
-
             // 尾部增加+號
             oriSql.append("\" " + line + "  \" \u002B \n");
         }
 
+        return "\" " + oriSql.toString();
+    }
+
+    // 增加查詢欄位別名
+    private static String addSelectColumnAlias(String oriSql, List<String> selectColumns, boolean isIntoTypeSql) {
+
+        String[] sqlLines = oriSql.split("\n");
+        StringBuilder result = new StringBuilder();
+        boolean isFromAppear = false;
+
+        for (int i = 0; i < sqlLines.length; i++) {
+
+            String sqlLine = sqlLines[i];
+
+            if (sqlLine.contains(":")) {continue;}
+
+            if (StrUtil.containsIgnoreCase(sqlLine,"FROM")) { isFromAppear = true;}
+
+            // FROM 關鍵字出現之前，替查詢欄位加上別名
+            if (!isFromAppear) {
+                // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
+                if (!isIntoTypeSql) {
+                    // 非最後一個查詢欄位
+                    if (sqlLine.contains(",")) {
+                        sqlLine = StrUtil.subBefore(sqlLine, ",", true) + " " + selectColumns.get(i).toUpperCase()
+                                + "," + StrUtil.subAfter(sqlLine, ",", true);
+                    }
+                    // 最後一個查詢欄位
+                    else {
+                        sqlLine = StrUtil.subBefore(sqlLine, "\"", true) + selectColumns.get(i).toUpperCase()
+                                + "  \"" + StrUtil.subAfter(sqlLine, "\"", true);
+                    }
+                } else {
+                    // 非最後一個查詢欄位
+                    if (sqlLine.contains(",")) {
+                        // 有SQL內置函數的 decode(custom_id)
+                        if (sqlLine.contains(")")) {
+                            sqlLine = StrUtil.subBefore(sqlLine, ")", true)+ ") " + selectColumns.get(i).toUpperCase()
+                                    + ", \" \u002B ";
+                        }
+                        // 沒有SQL內置函數的 "  payment_type  ,  " +
+                        else {
+                            sqlLine = StrUtil.subBefore(sqlLine, ",", true).trim() + " " + selectColumns.get(i).toUpperCase()
+                                    + "," + StrUtil.subAfter(sqlLine, ",", true);
+                        }
+                    }
+                    // 最後一個查詢欄位
+                    else {
+                        // 有SQL內置函數的 decode(custom_id)
+                        if (sqlLine.contains(")")) {
+                            sqlLine = StrUtil.subBefore(sqlLine, ")", true)+ ") " + selectColumns.get(i).toUpperCase()
+                                    + " \" \u002B ";
+                        }
+                        // 沒有SQL內置函數的 "  payment_type    " +
+                        else {
+                            sqlLine = StrUtil.subBefore(sqlLine, "\"", true).trim() + " " + selectColumns.get(i).toUpperCase()
+                                    + "  \"" + StrUtil.subAfter(sqlLine, "\"", true);
+                        }
+                    }
+                }
+            }
+            result.append(sqlLine + "\n");
+        }
+
+        return result.toString();
+    }
+
+    // 取得SQL查詢欄位
+    static List<String> getSqlSelectColumns(String oriSql, boolean isIntoTypeSql) {
+
+        // 請求查詢的欄位
+        List<String> selecColumns = new ArrayList<>();
+
+        // 行SQL的列表
+        List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
+
+
+        for (String line : sqlLines) {
+            // 讀到 FROM 則跳出
+            if (StrUtil.containsIgnoreCase(line, "FROM")) {
+                break;
+            }
+
+            // 此種SQL類型 select custom_id into :ls_custom_id
+            if (isIntoTypeSql) {
+                if (line.contains(":")) {
+                    String selectColumn = StrUtil.subBetween(line, ":", " ");
+                    if (selectColumn.contains(",")) {
+                        selectColumn = selectColumn.replace(",", "");
+                    }
+                    selecColumns.add(selectColumn);
+                }
+            }
+            // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
+            else {
+                String selectColumn = StrUtil.subBetween(line, ".", " ");
+                if (selectColumn.contains(",")) {
+                    selectColumn = selectColumn.replace(",", "");
+                }
+                selecColumns.add(selectColumn);
+            }
+        }
+
+        return selecColumns;
+    }
+
+    // 取得SQL查詢表
+    static String[] getSqlTables(String oriSql) {
+        String line = StrUtil.subBetween(oriSql.toUpperCase(), "FROM", "\"");
+        String[] tables = line.split(",");
+        StrUtil.trim(tables);
+        return tables;
+    }
+
+    // 取得SQL :param 變量
+    static Set<String> getSqlParams(String oriSql) {
+
+        // 參數集合
+        Set<String> params  = new LinkedHashSet();
+
+        // 行SQL的列表
+        List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
+
+        for (String line : sqlLines) {
+            String param = StrUtil.subBetween(line, ":", ",");
+            if (param != null) {
+                params.add(param);
+            }
+        }
+
+        return params;
+    }
+
+    // 處理SQL查詢語句
+    static String doSelect(String line, BufferedReader reader) throws IOException {
+
+        // 格式化過後的SQL語句
+        String oriSql = getOriSql(line, reader);
+        // 是否為 此種SQL類型 select custom_id into :ls_custom_id
+        boolean isIntoTypeSql = StrUtil.containsIgnoreCase(oriSql, "into");
+        // 請求查詢的欄位
+        List<String> selecColumns = getSqlSelectColumns(oriSql, isIntoTypeSql);
+        // 數據表
+        String[] tables = getSqlTables(oriSql);
+        // :參數
+        Set<String> params  = getSqlParams(oriSql);
+
+
+        // 增加查詢欄位別名
+        oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
         System.out.println(oriSql);
 
-        // 參數增加空格
+        // :參數增加空格
         String result = oriSql.toString().replace("(:", "( :");
 
 
         // 去除尾部 +號 並增加 ；號
         result = "sql = \"" +  StrUtil.subBefore(result, " + ", true) + ";\n";
 
-        // 請求參數映射
+        // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
         if (params.size() != 0) {
             result += "param = new HashMap(); \n";
             for (String param : params) {
@@ -260,21 +352,19 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句
+        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespository.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
         table = "resStrMap = (Map<String, String>) " + table + "Respository.findMapByNativeSql(sql, param);\n";
         result += table;
 
-        // 查詢結果封裝
-        // ls_temp = resStrMap.get("LS_TEMP");
+        // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
-            // 全大寫轉小寫
-            String lowerSelecColumn = "";
-            if (StrUtil.isUpperCase(selecColumn)) {
-                lowerSelecColumn = StrUtil.swapCase(selecColumn);
+            if (isIntoTypeSql) {
+                result = result  + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+            } else {
+                result = result + "ls_" + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
             }
-            result = result + "ls_" + lowerSelecColumn + " = resStrMap.get(\"" + selecColumn + "\");\n";
         }
 
         return result;
