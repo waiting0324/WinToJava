@@ -333,7 +333,6 @@ public class Main {
 
         // 增加查詢欄位別名
         oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
-        System.out.println(oriSql);
 
         // :參數增加空格
         String result = oriSql.toString().replace("(:", "( :");
@@ -360,8 +359,16 @@ public class Main {
 
         // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
+
             if (isIntoTypeSql) {
-                result = result  + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                // 數字類型
+                if (StrUtil.containsAnyIgnoreCase(selecColumn, "ll", "li", "ld")) {
+                    result = result + selecColumn.toLowerCase() + " = new BigDecimal(resStrMap.get(\"" + selecColumn.toUpperCase() + "\"));\n";
+                }
+                // 非數字類型
+                else {
+                    result = result + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                }
             } else {
                 result = result + "ls_" + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
             }
