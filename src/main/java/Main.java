@@ -1,3 +1,4 @@
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -7,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.*;
 
 /**
- * Create By Waiting on 2020/2/10
+ * @author Waiting on 2020/2/10
  */
 public class Main {
 
@@ -25,11 +26,11 @@ public class Main {
             boolean isSql = false;
 
             // 到最後或是註解則略過
-            if (line == null) break;
-            else if (trimLine.startsWith("//") || trimLine.startsWith("*")) continue;
+            if (line == null) {break;}
+            else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {continue;}
 
             // 聲明List加註釋
-            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) line = "// " + line;
+            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {line = "// " + line;}
 
             // 變量聲明
             else if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
@@ -57,6 +58,9 @@ public class Main {
                 line = doFuncDecl(line);
             }
 
+            else if (trimLine.startsWith("return")) {
+                line = line + "\n }";
+            }
 
             // 加上換行
             result.append(line + "\n");
@@ -65,11 +69,14 @@ public class Main {
 
         System.out.println("===============================");
         System.out.println(result);
+       /* BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
+        writer.write(result.toString());
+        writer.close();*/
     }
 
     // 參數賦值
     private static String doAsignParam(String line) {
-        String param = line.split("=")[0].trim();
+        String leftParam = line.split("=")[0].trim();
         String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
         String comment = StrUtil.subAfter(line, "//", true);
 
@@ -81,25 +88,29 @@ public class Main {
         else if (StrUtil.isWrap(func, "\'")) {
             func = func.replace("\'", "\"");
         }
-        // TODO 簡單加減計算  ll_ar_amt - ll_ar_recv_amt
+        // 簡單加減計算  ll_ar_amt - ll_ar_recv_amt
         else if (StrUtil.count(func, "-") == 1 || StrUtil.count(func, "+") == 1) {
             String operator = "";
+            String[] params = null;
             if (func.contains("-")) {
                 operator = "sub";
+                params = func.split("-");
             } else if (func.contains("+")) {
                 operator = "add";
+                params = func.split("\\+");
             }
-            func = StrUtil.format("{} = {};" , param, func);
+            StrUtil.trim(params);
+            func = StrUtil.format("{}.{}({})" , params[0], operator, params[1]);
         }
 
 
         // 有注釋
         if (!"".equals(comment)) {
-            return StrUtil.format("{} = {}; //{}" , param, func, comment);
+            return StrUtil.format("{} = {}; //{}" , leftParam, func, comment);
         }
         // 沒有注釋
         else {
-            return StrUtil.format("{} = {};" , param, func);
+            return StrUtil.format("{} = {};" , leftParam, func);
         }
 
     }
@@ -118,6 +129,7 @@ public class Main {
 
         // 常用變量聲明
         result += "String sql;\n";
+        result += "Map<String, Object> param;\n";
         result += "Map<String, String> resStrMap;\n";
         result += "Map<String, BigDecimal> resDecMap;\n";
 
@@ -171,40 +183,65 @@ public class Main {
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.trim();
 
+            // 取得查詢欄位
+            if (StrUtil.containsIgnoreCase(line, "FROM")) {
+                isFromAppear = true;
+            }
+            if (!isFromAppear) {
+                // 此種格式的SQL查詢 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
+                if (line.contains(".")) {
+                    String selectColumn = StrUtil.subAfter(line, ".", false);
+                    if (selectColumn.contains(",")) {
+                        selectColumn = selectColumn.replace(",", "");
+                    }
+                    selecColumns.add(selectColumn);
+                    // 增加查詢欄位別名
+                    if (line.trim().endsWith(",")) {
+                        line = StrUtil.subBefore(line, ",", true) + " " + selectColumn + ",";
+                    } else {
+                        line = line + " " + selectColumn;
+                    }
+                }
+                // 此種格式的SQL查詢 select custom_id into :ls_custom_id
+                else {
+                    /*reader.
+                    while (line += reader.readLine()) {
+
+                    }*/
+                }
+
+            }
+
             // 取得數據表
             if (StrUtil.startWithIgnoreCase(line, "FROM")) {
                 tables = StrUtil.subAfter(line, "FROM", false).split(",");
                 StrUtil.trim(tables);
             }
 
-            // 取得查詢欄位
-            if (StrUtil.containsIgnoreCase(line, "FROM")) isFromAppear = true;
-            if (!isFromAppear) {
-                String selectColumn = StrUtil.subAfter(line, ".", false);
-                if (selectColumn.contains(",")) selectColumn = selectColumn.replace(",", "");
-                selecColumns.add(selectColumn);
-                // 增加查詢欄位別名
-                if (line.trim().endsWith(",")) {
-                    line = StrUtil.subBefore(line, ",", true) + " " + selectColumn + ",";
-                } else {
-                    line = line + " " + selectColumn;
-                }
-            }
-
             // 空格格式化
-            if (StrUtil.startWithIgnoreCase(line, "FROM")) line = "   " + line;
-            else if (StrUtil.startWithIgnoreCase(line, "WHERE")) line = " " + line;
-            else if (StrUtil.startWithIgnoreCase(line, "AND")) line = "   " + line;
-            else if (StrUtil.startWithIgnoreCase(line, "ORDER")) line = " " + line;
-            else line = " " + line;
+            if (StrUtil.startWithIgnoreCase(line, "FROM")) {
+                line = "   " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "WHERE")) {
+                line = " " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "AND")) {
+                line = "   " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "ORDER")) {
+                line = " " + line;
+            } else {
+                line = " " + line;
+            }
 
             // 處理 :param 變量
             String param = StrUtil.subBetween(line, ":", ",");
-            if (param != null) params.add(param);
+            if (param != null) {
+                params.add(param);
+            }
 
             // 尾部增加+號
             oriSql.append("\" " + line + "  \" \u002B \n");
         }
+
+        System.out.println(oriSql);
 
         // 參數增加空格
         String result = oriSql.toString().replace("(:", "( :");
@@ -234,7 +271,9 @@ public class Main {
         for (String selecColumn : selecColumns) {
             // 全大寫轉小寫
             String lowerSelecColumn = "";
-            if (StrUtil.isUpperCase(selecColumn)) lowerSelecColumn = StrUtil.swapCase(selecColumn);
+            if (StrUtil.isUpperCase(selecColumn)) {
+                lowerSelecColumn = StrUtil.swapCase(selecColumn);
+            }
             result = result + "ls_" + lowerSelecColumn + " = resStrMap.get(\"" + selecColumn + "\");\n";
         }
 
@@ -246,10 +285,14 @@ public class Main {
 
         String trimLine = StrUtil.trimToEmpty(line);
         boolean isFalse = false;
-        String afterLine = StrUtil.subAfter(trimLine, "if", false).trim(); // if後的全部字串
-        String firstStr = StrUtil.subBefore(afterLine, " ", false); // if後的第一個關鍵字
-        String condi = StrUtil.subBetween(line, "if", "then").trim(); //條件判斷式
-        String func = StrUtil.subAfter(afterLine, "then", false); // 執行語句
+        // if後的全部字串
+        String afterLine = StrUtil.subAfter(trimLine, "if", false).trim();
+        // if後的第一個關鍵字
+        String firstStr = StrUtil.subBefore(afterLine, " ", false);
+        // 條件判斷式
+        String condi = StrUtil.subBetween(line, "if", "then").trim();
+        // 執行語句
+        String func = StrUtil.subAfter(afterLine, "then", false);
 
 
         // if isnull(ls_register_no) then ls_register_no  = ''
@@ -265,7 +308,7 @@ public class Main {
             line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
         }
 
-        if (firstStr.equals("not"))  {
+        if ("not".equals(firstStr))  {
             isFalse = true;
         }
 
@@ -320,13 +363,15 @@ public class Main {
         source = source.trim();
 
         String[] splits = source.split(" ");
-        if (splits.length == 1) { // 簡單類型，沒有運算符 len(trim(arg_bank_id))
+        // 簡單類型，沒有運算符 len(trim(arg_bank_id))
+        if (splits.length == 1) {
             String param = StrUtil.unWrap(source, "len(", ")");
             if (StrUtil.isWrap(param, "trim(", ")")) {
                 param = StrUtil.unWrap(param, "trim(", ")");
                 param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
             }
-            param += ".length()"; // param: StringUtils.trimToEmpty(arg_bank_id).length()
+            // param: StringUtils.trimToEmpty(arg_bank_id).length()
+            param += ".length()";
             params.add(param);
         } else {
             for (String param : splits) {
@@ -336,7 +381,8 @@ public class Main {
                         param = StrUtil.unWrap(param, "trim(", ")");
                         param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
                     }
-                    param += ".length()"; // param: StringUtils.trimToEmpty(arg_bank_id).length()
+                    // param: StringUtils.trimToEmpty(arg_bank_id).length()
+                    param += ".length()";
                     params.add(param);
 
                 } else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")){
@@ -350,7 +396,9 @@ public class Main {
 
         while (params.size() != 0) {
             result += params.pop();
-            if (operaters.size() != 0) result = result + " " + operaters.pop() + " ";
+            if (operaters.size() != 0) {
+                result = result + " " + operaters.pop() + " ";
+            }
         }
         return result;
     }

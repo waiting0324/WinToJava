@@ -1,22 +1,22 @@
-Str f_micb_chk_sum_generator (string arg_bank_id, string arg_user_id, long arg_amt)
-兆豐銀行客戶虛擬帳號檢核碼產生器
-string  ls_valid_account, ls_id, ls_amt
-integer li_i, li_j, li_value, li_remainder
-integer li_value1, li_value2, li_value3, li_value4
-if isnull(arg_bank_id) then arg_bank_id = ''
-if isnull(arg_user_id) then arg_user_id = ''
-if len(trim(arg_bank_id)) = 0 then return 'Fail'
-if len(trim(arg_user_id)) = 0 then return 'Fail'
-if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
-if isnull(arg_amt) then arg_amt = 0
-//用虛擬帳號找出基本資料設定之記帳客編
-DECLARE CUST_VIRTUAL_ACCOUNT CURSOR FOR
+// Str f_micb_chk_sum_generator (string arg_bank_id, string arg_user_id, long arg_amt)
+// 兆豐銀行客戶虛擬帳號檢核碼產生器
+// string  ls_valid_account, ls_id, ls_amt
+// integer li_i, li_j, li_value, li_remainder
+// integer li_value1, li_value2, li_value3, li_value4
+// if isnull(arg_bank_id) then arg_bank_id = ''
+// if isnull(arg_user_id) then arg_user_id = ''
+// if len(trim(arg_bank_id)) = 0 then return 'Fail'
+// if len(trim(arg_user_id)) = 0 then return 'Fail'
+// if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+// if isnull(arg_amt) then arg_amt = 0
+// //用虛擬帳號找出基本資料設定之記帳客編
+// DECLARE CUST_VIRTUAL_ACCOUNT CURSOR FOR
 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
        CUST_VIRTUAL_ACCOUNT.REGISTER_NO,
        ACCT_MAP.ACCT_NO
   FROM CUST_VIRTUAL_ACCOUNT, ACCT_MAP
  WHERE CUST_VIRTUAL_ACCOUNT.BANK_ID        = substr(:ls_virtual_account,1,4)
-   AND CUST_VIRTUAL_ACCOUNT.USER_ID        = substr(:ls_virtual_account22,5,9)
+   AND CUST_VIRTUAL_ACCOUNT.USER_ID        = substr(:ls_virtual_account,5,9)
    AND CUST_VIRTUAL_ACCOUNT.CHECK_SUM_ID   = substr(:ls_virtual_account33,14,1)
    AND NVL(CUST_VIRTUAL_ACCOUNT.REGISTER_NO,'CASH') <> 'CASH'
    AND CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION = ACCT_MAP.CARGO_LOCATION
@@ -24,15 +24,31 @@ SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
 ORDER BY CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
          CUST_VIRTUAL_ACCOUNT.REGISTER_NO
      ;
-string  ls_virtual_account, ls_cargo_location, ls_register_no, ls_start_date, ls_end_date, ls_payment_type, ls_ar_item
-string  ls_pay_str, ls_bank_acct_no, ls_cust_attr, ls_acct_no, ls_ar_type, ls_auto_write, ls_err_text
-string  ls_credit_no, ls_used_cust_id, ls_memo, ls_seq, ls_temp, ls_post, ls_desc
-long    ll_amt, ll_ar_amt, ll_ar_recv_amt, ll_pay_amt, ll_milus_amt, ll_non_rcv_cnt, ll_counter
-long    ll_b_vol1, ll_b_vol2, ll_b_vol3
-integer li_cnt, li_register_cnt, li_credit
-datetime ldt_now, l_dt
-ll_pay_amt     = ll_amt 
-ll_non_rcv_cnt = 0
-ls_acct_no = '1246'   // 房電費會計科目
-ls_ar_type = '008'
-ll_milus_amt = ll_ar_amt - ll_ar_recv_amt
+
+select decode(custom_id,NULL,agent_code,custom_id) custom_id,
+                               payment_type  ,
+                               cargo_location
+                          into :ls_custom_id,
+                               :ls_payment_type,
+                               :ls_cargo
+                          from invoice_master
+                         where slip_seqno     = substr(:ls_value3_temp,3)
+                           and cargo_location = decode(substr(:ls_value3,1,2),'CA','C','K')
+                           and status        <> 'C' 
+                        group by decode(custom_id,NULL,agent_code,custom_id),
+                                 payment_type,
+                                 cargo_location
+                                ;
+// string  ls_virtual_account, ls_cargo_location, ls_register_no, ls_start_date, ls_end_date, ls_payment_type, ls_ar_item
+// string  ls_pay_str, ls_bank_acct_no, ls_cust_attr, ls_acct_no, ls_ar_type, ls_auto_write, ls_err_text
+// string  ls_credit_no, ls_used_cust_id, ls_memo, ls_seq, ls_temp, ls_post, ls_desc
+// long    ll_amt, ll_ar_amt, ll_ar_recv_amt, ll_pay_amt, ll_milus_amt, ll_non_rcv_cnt, ll_counter
+// long    ll_b_vol1, ll_b_vol2, ll_b_vol3
+// integer li_cnt, li_register_cnt, li_credit
+// datetime ldt_now, l_dt
+// ll_pay_amt     = ll_amt 
+// ll_non_rcv_cnt = 0
+// ls_acct_no = '1246'   // 房電費會計科目
+// ls_ar_type = '008'
+ll_milus_amt = ll_ar_amt + ll_ar_recv_amt
+
