@@ -1,7 +1,10 @@
+import cn.hutool.core.math.MathUtil;
+import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -56,7 +59,7 @@ public class Main {
             }
 
             else if (trimLine.startsWith("return")) {
-                line = line + "\n }";
+                line = doReturn(line, false);
             }
 
             // 加上換行
@@ -71,8 +74,39 @@ public class Main {
         writer.close();*/
     }
 
+    static String doReturn(String line, boolean isIf) {
+
+        StringBuilder result = new StringBuilder();
+        line = line.trim().split(" ")[1].trim();
+
+        // 失敗
+        if ("\'Fail\'".equalsIgnoreCase(line)) {
+            result.append("\n// 失敗 \n");
+            result.append("return new TransactionData(false, \"\", FeeResultEnum.FE00_E0001, null, null);\n");
+        }
+        // 封裝字串 return new TransactionData(true, "", ResultEnum.SUCCESS, new String(li_value4), null);
+        else if (StrUtil.startWithIgnoreCase(line, "string")) {
+            String param = StrUtil.unWrap(line, "string(", ")");
+            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new String(" + param + "), null);\n");
+        }
+        // 是數字
+        else if (NumberUtil.isNumber(line)) {
+            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);\n");
+        }
+        // 返回JSON則標注待處理
+        else if (StrUtil.startWithIgnoreCase(line, "json")) {
+            result.append("// TODO 處理返回值\n");
+            result.append("new TransactionData(true, \"\", ResultEnum.SUCCESS, 返回值, null);\n");
+        }
+
+        // 非單行If的情況則加上大括號
+        if (isIf == false) result.append("}\n");
+
+        return result.toString();
+    }
+
     // 參數賦值
-    private static String doAsignParam(String line) {
+    static String doAsignParam(String line) {
         String leftParam = line.split("=")[0].trim();
         String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
         String comment = StrUtil.subAfter(line, "//", true);
@@ -113,7 +147,7 @@ public class Main {
     }
 
     // 函數聲明
-    private static String doFuncDecl(String line) {
+    static String doFuncDecl(String line) {
 
         // 駝峰函數名
         String funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, " ", "(").trim());
@@ -134,7 +168,7 @@ public class Main {
     }
 
     // 變量聲明
-    private static String doVariDecl(String line) {
+    static String doVariDecl(String line) {
 
         if (line.trim().startsWith("string")) {
             line = doString(line);
@@ -150,12 +184,12 @@ public class Main {
     }
 
     // 處理datetime類型聲明
-    private static String doDateTime(String line) {
+    static String doDateTime(String line) {
         return line.replace("datetime", "Timestamp");
     }
 
     // 取得格式化過後的SQL語句
-    private static String getOriSql(String line, BufferedReader reader) throws IOException {
+    static String getOriSql(String line, BufferedReader reader) throws IOException {
 
         // SQL 語句
         StringBuilder oriSql = new StringBuilder();
@@ -187,7 +221,7 @@ public class Main {
     }
 
     // 增加查詢欄位別名
-    private static String addSelectColumnAlias(String oriSql, List<String> selectColumns, boolean isIntoTypeSql) {
+    static String addSelectColumnAlias(String oriSql, List<String> selectColumns, boolean isIntoTypeSql) {
 
         String[] sqlLines = oriSql.split("\n");
         StringBuilder result = new StringBuilder();
@@ -418,12 +452,15 @@ public class Main {
             condiLeft = tranIfLenTrimParas(condiLeft);
 
             // 關鍵字轉換
-            func = func.replace("\'", "\"");
+            if (func.trim().startsWith("return")) {
+                func = doReturn(func, true);
+            }
+//            func = func.replace("\'", "\"");
 
             Integer number = ReUtil.getFirstNumber(line);
 
             // 拼接結果
-            line = StrUtil.indexedFormat("if ({0} == {1}) {2};", condiLeft, number, func);
+            line = StrUtil.format("if ({} == {}) { {} }", condiLeft, number, func);
         }
         return line;
     }
