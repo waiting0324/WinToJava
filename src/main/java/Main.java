@@ -1,4 +1,6 @@
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.math.MathUtil;
+import cn.hutool.core.text.StrSpliter;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
@@ -18,7 +20,9 @@ public class Main {
         StringBuilder result = new StringBuilder();
         InputStream is = new FileInputStream(Main.class.getClassLoader().getResource("source.txt").getPath());
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        int nowLine = 0;
         while (true) {
+            nowLine++;
             String line = reader.readLine();
             String trimLine = StrUtil.trimToEmpty(line);
 
@@ -79,10 +83,10 @@ public class Main {
 
 
         System.out.println("===============================");
-//        System.out.println(result);
-       /* BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
+        System.out.println(result);
+        BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
         writer.write(result.toString());
-        writer.close();*/
+        writer.close();
     }
 
     static String doMessagebox(String line, BufferedReader reader) throws IOException {
@@ -294,6 +298,15 @@ public class Main {
             oriSql.append("\" " + line + "  \" \u002B \n");
         }
 
+        // 處理格式異常的SQL: ;不是獨立一行
+        if (!";".equals(line.trim())) {
+            line = line.trim();
+            line = "   " + line;
+            // 尾部增加+號
+            oriSql.append("\" " + line + "  \" \u002B \n");
+            oriSql.append(StrUtil.subBefore(line, ";", true));
+        }
+
         return "\" " + oriSql.toString();
     }
 
@@ -303,14 +316,16 @@ public class Main {
         String[] sqlLines = oriSql.split("\n");
         StringBuilder result = new StringBuilder();
         boolean isFromAppear = false;
+        boolean isIntoAppear = false;
 
         for (int i = 0; i < sqlLines.length; i++) {
 
             String sqlLine = sqlLines[i];
 
-            if (sqlLine.contains(":")) {continue;}
-
+            if (StrUtil.containsIgnoreCase(sqlLine,"INTO")) { isIntoAppear = true;}
             if (StrUtil.containsIgnoreCase(sqlLine,"FROM")) { isFromAppear = true;}
+
+            if (isIntoAppear && sqlLine.contains(":")) {continue;}
 
             // FROM 關鍵字出現之前，替查詢欄位加上別名
             if (!isFromAppear) {
@@ -390,6 +405,11 @@ public class Main {
             // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
             else {
                 String selectColumn = StrUtil.subBetween(line, ".", " ");
+                // select register_no
+                //      from registered_customer
+                if (selectColumn == null) {
+                    selectColumn = StrUtil.subAfter(line, "select", false);
+                }
                 if (selectColumn.contains(",")) {
                     selectColumn = selectColumn.replace(",", "");
                 }
@@ -417,10 +437,15 @@ public class Main {
         // 行SQL的列表
         List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
 
+        // substr(:ls_virtual_account,1,4)
+        // = :ls_virtual_account
+
         for (String line : sqlLines) {
             String param = StrUtil.subBetween(line, ":", ",");
+            if (param == null) param = StrUtil.subBetween(line, ":", "|");
+            if (param == null) param = StrUtil.subBetween(line, ":", "\n");
             if (param != null) {
-                params.add(param);
+                params.add(param.trim());
             }
         }
 
@@ -450,7 +475,7 @@ public class Main {
 
 
         // 去除尾部 +號 並增加 ；號
-        result = "sql = \"" +  StrUtil.subBefore(result, " + ", true) + ";\n";
+        result = "sql = " +  StrUtil.subBefore(result, " + ", true) + ";\n";
 
         // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
         if (params.size() != 0) {
@@ -470,7 +495,7 @@ public class Main {
 
         // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
-
+            selecColumn = selecColumn.trim();
             if (isIntoTypeSql) {
                 // 數字類型
                 if (StrUtil.containsAnyIgnoreCase(selecColumn, "ll", "li", "ld")) {
@@ -498,6 +523,7 @@ public class Main {
         // if後的第一個關鍵字
         String firstStr = StrUtil.subBefore(afterLine, " ", false);
         // 條件判斷式
+        System.out.println(line);
         String condi = StrUtil.subBetween(line, "if", "then").trim();
         // 執行語句
         String func = StrUtil.subAfter(afterLine, "then", false);
