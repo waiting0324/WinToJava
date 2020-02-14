@@ -84,6 +84,11 @@ public class Main {
             else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue", "else")) {
                 line = doKeyword(line);
             }
+            // 新增或更新SQL
+            else if (StrUtil.startWithIgnoreCase(trimLine, "UPDATE")
+                || StrUtil.startWithIgnoreCase(trimLine, "INSERT")) {
+                line = doUpdate(line, reader);
+            }
 
 
             // 加上換行
@@ -98,8 +103,41 @@ public class Main {
         writer.close();
     }
 
+    static String doUpdate(String line, BufferedReader reader) throws IOException {
+
+        String oriSql = getOriSql(line, reader);
+        Set<String> params = getSqlParams(oriSql);
+        String table = StrUtil.subBetween(oriSql.toUpperCase(), "UPDATE", "\"");
+        if (table == null) table = StrUtil.subBetween(oriSql.toUpperCase(), "INSERT INTO", "\n");
+
+        table = table.replace("\"", "").replace("+", "").trim();
+
+        // :參數增加空格
+        String result = oriSql.toString().replace("(:", "( :").replace("=:", "= :");
+
+        // 去除尾部 +號 並增加 ；號
+        result = "sql = " + StrUtil.subBefore(result, " + ", true) + ";\n";
+
+        // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
+        if (params.size() != 0) {
+            result += "param = new HashMap(); \n";
+            for (String param : params) {
+                result = result + "param.put(\"" + param + "\", " + param + ");\n";
+            }
+        }
+
+        result += "\n";
+
+        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespository.findMapByNativeSql(sql, param);
+        table = StrUtil.toCamelCase(table);
+        table = table + "Respository.executeUpdate(sql, param);\n";
+        result += table;
+
+        return result;
+    }
+
     // 特殊運算符 += ++ -=
-    private static String doSpecialOperator(String line) {
+    static String doSpecialOperator(String line) {
 
         if (line.contains("++")) {
             String param = StrUtil.subBefore(line, "++", true).trim();
@@ -505,6 +543,7 @@ public class Main {
             String param = StrUtil.subBetween(line, ":", ",");
             if (param == null) param = StrUtil.subBetween(line, ":", "|");
             if (param == null) param = StrUtil.subBetween(line, ":", "\n");
+            if (param == null) param = StrUtil.subBetween(line, ":", " ");
             if (param != null) {
                 params.add(param.trim());
             }
@@ -532,7 +571,7 @@ public class Main {
         oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
 
         // :參數增加空格
-        String result = oriSql.toString().replace("(:", "( :");
+        String result = oriSql.toString().replace("(:", "( :").replace("=:", "= :");;
 
 
         // 去除尾部 +號 並增加 ；號
