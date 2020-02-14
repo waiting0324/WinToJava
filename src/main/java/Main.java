@@ -30,11 +30,16 @@ public class Main {
             boolean isSql = false;
 
             // 到最後或是註解則略過
-            if (line == null) {break;}
-            else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {continue;}
+            if (line == null) {
+                break;
+            } else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {
+                continue;
+            }
 
             // 聲明List加註釋
-            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {line = "// " + line;}
+            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {
+                line = "// " + line;
+            }
 
             // 變量聲明
             else if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
@@ -47,13 +52,13 @@ public class Main {
             }
 
             // 參數賦值
-            else if (StrUtil.startWithAny(line, "ls_", "li_", "ll_")) {
+            else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_")) {
                 line = doAsignParam(line);
             }
 
             // 條件語句
             else if (trimLine.startsWith("if")) {
-                line = doIf(line);
+                line = doIf(line, reader);
             }
 
             // 查詢語句
@@ -74,7 +79,6 @@ public class Main {
             else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue")) {
                 line = doKeyword(line);
             }
-
 
 
             // 加上換行
@@ -212,19 +216,41 @@ public class Main {
                 params = func.split("\\+");
             }
             StrUtil.trim(params);
-            func = StrUtil.format("{}.{}({})" , params[0], operator, params[1]);
+            func = StrUtil.format("{}.{}({})", params[0], operator, params[1]);
+        }
+        // 取MOD計算  mod(li_i,3) //除以3之餘數
+        else if (func.startsWith("mod")) {
+            String[] split = StrUtil.unWrap(func, "mod(", ")").split(",");
+            func = StrUtil.format("new BigDecimal({}.intValue() % {})", split[0], split[1]);
+        }
+        // 擷取字串
+        else if (func.startsWith("substr")) {
+            func = doSubStr(func);
         }
 
 
         // 有注釋
         if (!"".equals(comment)) {
-            return StrUtil.format("{} = {}; //{}" , leftParam, func, comment);
+            return StrUtil.format("{} = {}; //{}", leftParam, func, comment);
         }
         // 沒有注釋
         else {
-            return StrUtil.format("{} = {};" , leftParam, func);
+            return StrUtil.format("{} = {};", leftParam, func);
         }
 
+    }
+
+    // 擷取字串 substr(ls_valid_account,li_i,1)
+    static String doSubStr(String func) {
+        String[] split = StrUtil.unWrap(func, "substr(", ")").split(",");
+        // ls_id = substr(ls_valid_account,li_i,1)
+        if (split[1].contains("_")) {
+            func = StrUtil.format("{}.subString({}.intValue()-1, {}.intValue() + {}))", split[0], split[1], split[1], Integer.parseInt(split[2])-2);
+        } else {
+            func = StrUtil.format("{}.subString({}, {})", split[0], Integer.parseInt(split[1]) - 1,
+                    Integer.parseInt(split[1]) + Integer.parseInt(split[2]) - 2);
+        }
+        return func;
     }
 
     // 函數聲明
@@ -279,6 +305,7 @@ public class Main {
         oriSql.append(line + " \" \u002B \n");
 
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
+            line = line.replace("\"", "\'");
             line = line.trim();
 
             // 空格格式化
@@ -322,10 +349,16 @@ public class Main {
 
             String sqlLine = sqlLines[i];
 
-            if (StrUtil.containsIgnoreCase(sqlLine,"INTO")) { isIntoAppear = true;}
-            if (StrUtil.containsIgnoreCase(sqlLine,"FROM")) { isFromAppear = true;}
+            if (StrUtil.containsIgnoreCase(sqlLine, "INTO")) {
+                isIntoAppear = true;
+            }
+            if (StrUtil.containsIgnoreCase(sqlLine, "FROM")) {
+                isFromAppear = true;
+            }
 
-            if (isIntoAppear && sqlLine.contains(":")) {continue;}
+            if (isIntoAppear && sqlLine.contains(":")) {
+                continue;
+            }
 
             // FROM 關鍵字出現之前，替查詢欄位加上別名
             if (!isFromAppear) {
@@ -346,7 +379,7 @@ public class Main {
                     if (sqlLine.contains(",")) {
                         // 有SQL內置函數的 decode(custom_id)
                         if (sqlLine.contains(")")) {
-                            sqlLine = StrUtil.subBefore(sqlLine, ")", true)+ ") " + selectColumns.get(i).toUpperCase()
+                            sqlLine = StrUtil.subBefore(sqlLine, ")", true) + ") " + selectColumns.get(i).toUpperCase()
                                     + ", \" \u002B ";
                         }
                         // 沒有SQL內置函數的 "  payment_type  ,  " +
@@ -359,7 +392,7 @@ public class Main {
                     else {
                         // 有SQL內置函數的 decode(custom_id)
                         if (sqlLine.contains(")")) {
-                            sqlLine = StrUtil.subBefore(sqlLine, ")", true)+ ") " + selectColumns.get(i).toUpperCase()
+                            sqlLine = StrUtil.subBefore(sqlLine, ")", true) + ") " + selectColumns.get(i).toUpperCase()
                                     + " \" \u002B ";
                         }
                         // 沒有SQL內置函數的 "  payment_type    " +
@@ -432,7 +465,7 @@ public class Main {
     static Set<String> getSqlParams(String oriSql) {
 
         // 參數集合
-        Set<String> params  = new LinkedHashSet();
+        Set<String> params = new LinkedHashSet();
 
         // 行SQL的列表
         List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
@@ -464,7 +497,7 @@ public class Main {
         // 數據表
         String[] tables = getSqlTables(oriSql);
         // :參數
-        Set<String> params  = getSqlParams(oriSql);
+        Set<String> params = getSqlParams(oriSql);
 
 
         // 增加查詢欄位別名
@@ -475,7 +508,7 @@ public class Main {
 
 
         // 去除尾部 +號 並增加 ；號
-        result = "sql = " +  StrUtil.subBefore(result, " + ", true) + ";\n";
+        result = "sql = " + StrUtil.subBefore(result, " + ", true) + ";\n";
 
         // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
         if (params.size() != 0) {
@@ -514,7 +547,11 @@ public class Main {
     }
 
     // 處理if條件判斷式
-    static String doIf(String line) {
+    static String doIf(String line, BufferedReader reader) throws IOException {
+
+        if (!line.contains("then")) {
+            while (!(line += reader.readLine()).contains("then")) ;
+        }
 
         String trimLine = StrUtil.trimToEmpty(line);
         boolean isFalse = false;
@@ -542,7 +579,7 @@ public class Main {
             line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
         }
 
-        if ("not".equals(firstStr))  {
+        if ("not".equals(firstStr)) {
             isFalse = true;
         }
 
@@ -551,7 +588,8 @@ public class Main {
         if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
 
             // 處理條件判斷式
-            String condiLeft = StrUtil.subBefore(condi, "=", false).trim();; // 條件判斷式左側
+            String condiLeft = StrUtil.subBefore(condi, "=", false).trim();
+            ; // 條件判斷式左側
             condiLeft = tranIfLenTrimParas(condiLeft);
 
             // 關鍵字轉換
@@ -622,7 +660,7 @@ public class Main {
                     param += ".length()";
                     params.add(param);
 
-                } else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")){
+                } else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")) {
                     operaters.add(param.trim());
                 }
             }
