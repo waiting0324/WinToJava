@@ -290,7 +290,7 @@ public class Main {
             func = StrUtil.format("new BigDecimal({}.intValue() % {})", split[0], split[1]);
         }
         // 擷取字串
-        else if (func.startsWith("substr")) {
+        else if (StrUtil.startWithAny(func, "substr", "mid")) {
             func = doSubStr(func);
         }
 
@@ -309,6 +309,7 @@ public class Main {
 
     // 擷取字串 substr(ls_valid_account,li_i,1)
     static String doSubStr(String func) {
+        func = func.replace("mid", "substr");
         String[] split = StrUtil.unWrap(func, "substr(", ")").split(",");
         // ls_id = substr(ls_valid_account,li_i,1)
         /*if (split[1].contains("_")) {
