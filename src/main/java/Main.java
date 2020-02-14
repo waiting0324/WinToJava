@@ -674,8 +674,23 @@ public class Main {
         if (condi.startsWith("ls_")) {
             // ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B')
             List<String> split = StrUtil.splitTrim(condi, "=");
-            System.out.println(line);
             condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+            line = StrUtil.format("if ({}) { {}; }", condi, func);
+        }
+        // ll_pay_amt = 0
+        else if (StrUtil.startWithAny(condi, "ll_", "li_", "ld_")) {
+            String operator = StrUtil.subBetween(condi.trim(), " ", " ");
+            List<String> split = null;
+            if ("=".equals(operator)) {
+                split = StrUtil.splitTrim(condi, "=");
+            } else if (">".equals(operator)) {
+                split = StrUtil.splitTrim(condi, ">");
+            } else if ("<".equals(operator)) {
+                split = StrUtil.splitTrim(condi, "<>>");
+            } else {
+                return line = StrUtil.format("if ({}) { {}; }", condi, func);
+            }
+            condi = StrUtil.format("{}.intValue() == {}", split.get(0), split.get(1));
             line = StrUtil.format("if ({}) { {}; }", condi, func);
         }
 
