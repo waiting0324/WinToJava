@@ -20,9 +20,9 @@ public class Main {
         StringBuilder result = new StringBuilder();
         InputStream is = new FileInputStream(Main.class.getClassLoader().getResource("source.txt").getPath());
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        int nowLine = 0;
+
+
         while (true) {
-            nowLine++;
             String line = reader.readLine();
             String trimLine = StrUtil.trimToEmpty(line);
 
@@ -51,6 +51,11 @@ public class Main {
                 line = doMessagebox(line, reader);
             }
 
+            // 特殊運算符
+            else if (StrUtil.containsAny(trimLine, "+=", "++", "-=")) {
+                line = doSpecialOperator(line);
+            }
+
             // 參數賦值
             else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_")) {
                 line = doAsignParam(line);
@@ -76,7 +81,7 @@ public class Main {
                 line = doReturn(line, false);
             }
             // 關鍵字
-            else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue")) {
+            else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue", "else")) {
                 line = doKeyword(line);
             }
 
@@ -91,6 +96,27 @@ public class Main {
         BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
         writer.write(result.toString());
         writer.close();
+    }
+
+    // 特殊運算符 += ++ -=
+    private static String doSpecialOperator(String line) {
+
+        if (line.contains("++")) {
+            String param = StrUtil.subBefore(line, "++", true).trim();
+            line = StrUtil.indexedFormat("{0} = {0}.add({0})", param);
+        }
+        else if (line.contains("+=")) {
+            String leftParam = line.split("\\+=")[0].trim();
+            String func = line.split("\\+=")[1].trim();
+            line = StrUtil.indexedFormat("{0} = {0}.add({1})", leftParam, func);
+        }
+        else if (line.contains("-=")) {
+            String leftParam = line.split("-=")[0].trim();
+            String func = line.split("-=")[1].trim();
+            line = StrUtil.indexedFormat("{0} = {0}.sub({1})", leftParam, func);
+        }
+
+        return line + ";";
     }
 
     static String doMessagebox(String line, BufferedReader reader) throws IOException {
@@ -154,6 +180,8 @@ public class Main {
             return "// " + line;
         } else if (trimLine.startsWith("continue")) {
             return line + ";";
+        } else if (trimLine.startsWith("else")) {
+            return line.replace("else", "} else {");
         }
 
         return "";
@@ -229,6 +257,7 @@ public class Main {
         }
 
 
+
         // 有注釋
         if (!"".equals(comment)) {
             return StrUtil.format("{} = {}; //{}", leftParam, func, comment);
@@ -244,12 +273,11 @@ public class Main {
     static String doSubStr(String func) {
         String[] split = StrUtil.unWrap(func, "substr(", ")").split(",");
         // ls_id = substr(ls_valid_account,li_i,1)
-        if (split[1].contains("_")) {
+        /*if (split[1].contains("_")) {
             func = StrUtil.format("{}.subString({}.intValue()-1, {}.intValue() + {}))", split[0], split[1], split[1], Integer.parseInt(split[2])-2);
-        } else {
-            func = StrUtil.format("{}.subString({}, {})", split[0], Integer.parseInt(split[1]) - 1,
-                    Integer.parseInt(split[1]) + Integer.parseInt(split[2]) - 2);
-        }
+        } else {*/
+            func = StrUtil.format("{}.substring({}, {}) //TODO 更改位置", split[0], split[1], split[2]);
+        //}
         return func;
     }
 
@@ -549,6 +577,11 @@ public class Main {
     // 處理if條件判斷式
     static String doIf(String line, BufferedReader reader) throws IOException {
 
+        // 替換關鍵字
+        line = line.replace("and", "&&").replace("or", "||")
+                .replace("\'", "\"").replace("<>", "!=");
+
+
         if (!line.contains("then")) {
             while (!(line += reader.readLine()).contains("then")) ;
         }
@@ -560,7 +593,6 @@ public class Main {
         // if後的第一個關鍵字
         String firstStr = StrUtil.subBefore(afterLine, " ", false);
         // 條件判斷式
-        System.out.println(line);
         String condi = StrUtil.subBetween(line, "if", "then").trim();
         // 執行語句
         String func = StrUtil.subAfter(afterLine, "then", false);
@@ -578,18 +610,13 @@ public class Main {
             // 轉換結果
             line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
         }
-
-        if ("not".equals(firstStr)) {
-            isFalse = true;
-        }
-
         // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
         // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
-        if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
+        else if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
 
             // 處理條件判斷式
             String condiLeft = StrUtil.subBefore(condi, "=", false).trim();
-            ; // 條件判斷式左側
+            // 條件判斷式左側
             condiLeft = tranIfLenTrimParas(condiLeft);
 
             // 關鍵字轉換
@@ -603,6 +630,20 @@ public class Main {
             // 拼接結果
             line = StrUtil.format("if ({} == {}) { {} }", condiLeft, number, func);
         }
+
+//        System.out.println(line);
+        if (condi.startsWith("ls_")) {
+            // ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B')
+            List<String> split = StrUtil.splitTrim(condi, "=");
+            System.out.println(line);
+            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+            line = StrUtil.format("if ({}) { {}; }", condi, func);
+        }
+
+       /* else if ("not".equals(firstStr)) {
+            isFalse = true;
+        }
+*/
         return line;
     }
 

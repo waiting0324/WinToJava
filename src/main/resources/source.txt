@@ -1,10 +1,22 @@
+Str f_micb_chk_sum_generator (string arg_bank_id, string arg_user_id, long arg_amt)
+// 兆豐銀行客戶虛擬帳號檢核碼產生器
+string  ls_valid_account, ls_id, ls_amt
+integer li_i, li_j, li_value, li_remainder
+integer li_value1, li_value2, li_value3, li_value4
+
+if isnull(arg_bank_id) then arg_bank_id = ''
+if isnull(arg_user_id) then arg_user_id = ''
+if len(trim(arg_bank_id)) = 0 then return 'Fail'
+if len(trim(arg_user_id)) = 0 then return 'Fail'
+if not len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
+if isnull(arg_amt) then arg_amt = 0
+
 ls_valid_account = arg_bank_id + arg_user_id
 
 li_value1 = 0
 for li_i = 1 to 13
         ls_id = substr(ls_valid_account,li_i,1)
-        ls_id = substr(ls_valid_account,3,2)
-        // example 3150-123456789
+        // example 3150-123456789 
         // (7*4) + (5*8) + (3*2) + (0*4) + (1*8) + (2*2) + (3*4) + (4*8) + (5*2) ........
         li_remainder = mod(li_i,3) //除以3之餘數
         
@@ -19,3 +31,1356 @@ for li_i = 1 to 13
         end choose
         li_value1 += li_value
 next
+// 取個位數
+li_value1 = integer(substr(string(li_value1),len(string(li_value1)),1))
+
+ls_amt = fill('0',8 - len(string(arg_amt)))  // 金額可傳 0
+//金額以8降冪算
+// 12345 -->  0 0 0 1 2 3 4 5 
+//          * 8 7 6 5 4 3 2 1
+//           ----------------
+li_j      = 1
+li_value2 = 0
+for li_i  = 8 to 1 step -1
+     li_value2 += (integer(substr(ls_amt,li_j,1)) * li_i)
+     li_j ++
+next
+
+// 取個位數
+li_value2 = integer(substr(string(li_value2),len(string(li_value2)),1))
+
+// li_value1 + li_value2 取個位數
+li_value3 = integer(substr(string(li_value1 + li_value2),len(string(li_value1 + li_value2)),1))
+
+li_value4 = 10 - li_value3
+li_value4 = integer(substr(string(li_value4),len(string(li_value4)),1))
+
+return string(li_value4)
+
+
+
+
+json f_ar_receive_post ();
+string  ls_virtual_account, ls_cargo_location, ls_register_no, ls_start_date, ls_end_date, ls_payment_type, ls_ar_item
+string  ls_pay_str, ls_bank_acct_no, ls_cust_attr, ls_acct_no, ls_ar_type, ls_auto_write, ls_err_text
+string  ls_credit_no, ls_used_cust_id, ls_memo, ls_seq, ls_temp, ls_post, ls_desc
+long    ll_amt, ll_ar_amt, ll_ar_recv_amt, ll_pay_amt, ll_milus_amt, ll_non_rcv_cnt, ll_counter
+long    ll_b_vol1, ll_b_vol2, ll_b_vol3
+integer li_cnt, li_register_cnt, li_credit
+datetime ldt_now, l_dt
+
+// 稽核人員 or 會計組 才須檢核並顯示訊息
+if integer(gs_uinfo.u_job_type) = 8 or gs_uinfo.u_section = 'FZFA' or gs_uinfo.u_id = 'eds' then
+    do nothing
+else
+    return 0
+end if
+
+// 用虛擬帳號找出基本資料設定之記帳客編
+DECLARE CUST_VIRTUAL_ACCOUNT CURSOR FOR
+SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
+       CUST_VIRTUAL_ACCOUNT.REGISTER_NO,
+       ACCT_MAP.ACCT_NO
+  FROM CUST_VIRTUAL_ACCOUNT, ACCT_MAP
+ WHERE CUST_VIRTUAL_ACCOUNT.BANK_ID        = substr(:ls_virtual_account,1,4)
+   AND CUST_VIRTUAL_ACCOUNT.USER_ID        = substr(:ls_virtual_account,5,9)
+   AND CUST_VIRTUAL_ACCOUNT.CHECK_SUM_ID   = substr(:ls_virtual_account,14,1)
+   AND NVL(CUST_VIRTUAL_ACCOUNT.REGISTER_NO,'CASH') <> 'CASH'
+   AND CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION = ACCT_MAP.CARGO_LOCATION
+   AND '138'                               = ACCT_MAP.CHARGE_TYPE
+ORDER BY CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION,
+         CUST_VIRTUAL_ACCOUNT.REGISTER_NO
+     ;       
+                
+// 用虛擬帳號找出應收帳款下之記帳客編
+DECLARE AR_RECEIVE CURSOR FOR
+SELECT AR_RECEIVE.CARGO_LOCATION,
+       AR_RECEIVE.CUSTOM_ID,
+       AR_RECEIVE.START_DATE,
+       AR_RECEIVE.END_DATE,
+       AR_RECEIVE.PAYMENT_TYPE,              
+       AR_RECEIVE.AR_ITEM,
+       AR_RECEIVE.AR_AMT,
+       AR_RECEIVE.AR_REC_AMT,
+       ACCT_MAP.ACCT_NO
+  FROM AR_RECEIVE, ACCT_MAP
+ WHERE AR_RECEIVE.VIRTUAL_ACCOUNT = :ls_virtual_account
+   AND AR_RECEIVE.AR_AMT - NVL(AR_RECEIVE.AR_REC_AMT,0) > 0
+   AND AR_RECEIVE.CARGO_LOCATION  = ACCT_MAP.CARGO_LOCATION
+   AND '138'                      = ACCT_MAP.CHARGE_TYPE
+ORDER BY AR_RECEIVE.START_DATE,
+         AR_RECEIVE.END_DATE,
+         AR_RECEIVE.CUSTOM_ID
+     ;
+                        
+// 讀取銀行傳來之記帳客戶匯款尚未處理資料 STATUS = 'N' AND ERR_DESC = ' '
+DECLARE CUST_REMITTANCE CURSOR FOR
+SELECT CUST_REMITTANCE.VIRTUAL_ACCOUNT,
+       CUST_REMITTANCE.AMT
+  FROM(
+       SELECT "CUST_REMITTANCE"."TYPE" || TRIM("CUST_REMITTANCE"."PR_KEY1")                          virtual_account, 
+              sum(decode("CUST_REMITTANCE"."AMTSIGN",'+',1,'-',-1,0) * "CUST_REMITTANCE"."TXAMOUNT") AMT    
+         FROM "CUST_REMITTANCE"
+        WHERE TRIM("CUST_REMITTANCE"."USERID") = '70759575'
+          AND "CUST_REMITTANCE"."STATUS"                = 'N'
+          AND TRIM(NVL("CUST_REMITTANCE"."ERR_DESC",' ')) IS NULL
+       GROUP BY "CUST_REMITTANCE"."TYPE" || TRIM("CUST_REMITTANCE"."PR_KEY1")  
+      )CUST_REMITTANCE
+ WHERE CUST_REMITTANCE.AMT > 0        
+ORDER BY CUST_REMITTANCE.VIRTUAL_ACCOUNT        
+     ;
+                        
+open CUST_REMITTANCE ;
+do while true
+    fetch CUST_REMITTANCE
+     into :ls_virtual_account,
+          :ll_amt;
+          
+    if sqlca.sqlcode <> 0 then exit
+    
+    li_register_cnt = 0
+    // 判斷匯款對象是否為記帳客戶? 若是現金客戶則 waive, 記帳客戶才需繼續沖銷
+    select count(*)
+      into :li_register_cnt
+      from CUST_VIRTUAL_ACCOUNT
+    where CUST_VIRTUAL_ACCOUNT.BANK_ID        = substr(:ls_virtual_account,1,4)
+      and CUST_VIRTUAL_ACCOUNT.USER_ID        = substr(:ls_virtual_account,5,9) 
+      and CUST_VIRTUAL_ACCOUNT.CHECK_SUM_ID   = substr(:ls_virtual_account,14,1)
+      and NVL(CUST_VIRTUAL_ACCOUNT.REGISTER_NO,'CASH') <> 'CASH'
+         ;
+    if isnull(li_register_cnt) then li_register_cnt = 0
+    if li_register_cnt = 0 then continue    
+    
+    if isnull(ll_amt) then ll_amt = 0
+    
+    ll_pay_amt     = ll_amt 
+    ll_non_rcv_cnt = 0
+    
+    SELECT COUNT(*)
+      INTO :ll_non_rcv_cnt
+      FROM(
+           SELECT AR_RECEIVE.CARGO_LOCATION,
+                  AR_RECEIVE.CUSTOM_ID,
+                  AR_RECEIVE.VIRTUAL_ACCOUNT,
+                  AR_RECEIVE.START_DATE,
+                  AR_RECEIVE.END_DATE,
+                  AR_RECEIVE.PAYMENT_TYPE,                
+                  AR_RECEIVE.AR_ITEM,
+                  ACCT_MAP.ACCT_NO
+             FROM AR_RECEIVE, ACCT_MAP
+            WHERE AR_RECEIVE.VIRTUAL_ACCOUNT = :ls_virtual_account
+              AND AR_RECEIVE.AR_AMT - NVL(AR_RECEIVE.AR_REC_AMT,0) > 0
+              AND AR_RECEIVE.CARGO_LOCATION  = ACCT_MAP.CARGO_LOCATION
+              AND '138'                      = ACCT_MAP.CHARGE_TYPE
+           ORDER BY AR_RECEIVE.START_DATE,
+                    AR_RECEIVE.END_DATE,
+                    AR_RECEIVE.CUSTOM_ID
+          );
+    if isnull(ll_non_rcv_cnt) then ll_non_rcv_cnt = 0
+        
+   // 先檢核需繳款金額是否完全等於應收帳款金額
+   // 同一虛擬帳號 可對應多家記帳客戶,所以可沖銷多家記帳客戶多期應收帳款金額
+   ll_counter = 0
+   ls_post    = 'N'  // 預設為不過帳,若繳款金額 = 比對後記帳客戶應收帳款金額 才過帳(需沖銷比對多家帳款狀況)
+   open AR_RECEIVE ;
+   do while true                   
+       fetch AR_RECEIVE
+        into :ls_cargo_location,
+             :ls_register_no,
+             :ls_start_date,
+             :ls_end_date,
+             :ls_payment_type,
+             :ls_ar_item,
+             :ll_ar_amt,
+             :ll_ar_recv_amt,
+             :ls_bank_acct_no
+            ;
+       if sqlca.sqlcode <> 0 then exit         
+       
+       ll_counter ++
+       
+       if isnull(ll_ar_amt)      then ll_ar_amt      = 0
+       if isnull(ll_ar_recv_amt) then ll_ar_recv_amt = 0
+                       
+       select AR_AMT,   
+              nvl(AR_REC_AMT,0)
+         into :ll_ar_amt,
+              :ll_ar_recv_amt
+         from ar_receive
+        where cargo_location  =:ls_cargo_location
+          and start_date      =:ls_start_date
+          and end_date        =:ls_end_date
+          and custom_id       =:ls_register_no 
+          and virtual_account =:ls_virtual_account
+          and nvl(ar_amt,0) - nvl(ar_rec_amt,0) = :ll_ar_amt - :ll_ar_recv_amt
+             ;                                           
+       if ll_non_rcv_cnt = ll_counter and ll_pay_amt = (ll_ar_amt - ll_ar_recv_amt) then  // 最後一家客戶且匯款金額等於未收帳款餘額
+           ls_post = 'Y'
+           exit
+       end if
+       
+       ll_pay_amt -= (ll_ar_amt - ll_ar_recv_amt)                      
+   loop    
+   close AR_RECEIVE ;
+   
+   // if ll_pay_amt = 0 then //表示在應收帳款檔案 一筆都找不到對應記帳客戶資料可沖銷
+   // 檢核需繳款金額完全等於應收帳款金額才可過帳沖銷並釋放額度
+   open AR_RECEIVE;
+   // 比對應收帳款餘額是否等於記帳客戶匯款金額
+   // 同一虛擬帳號 可對應多家記帳客戶,所以可沖銷多家記帳客戶多期應收帳款金額
+   ll_counter = 0
+   ll_pay_amt = ll_amt     
+   
+   do while true                   
+       fetch AR_RECEIVE
+        into :ls_cargo_location,
+             :ls_register_no,
+             :ls_start_date,
+             :ls_end_date,
+             :ls_payment_type,
+             :ls_ar_item,
+             :ll_ar_amt,
+             :ll_ar_recv_amt,
+             :ls_bank_acct_no
+            ;
+       if sqlca.sqlcode <> 0 then exit         
+       
+       ll_counter ++
+       
+       if isnull(ll_ar_amt)      then ll_ar_amt      = 0
+       if isnull(ll_ar_recv_amt) then ll_ar_recv_amt = 0
+   
+       if ll_pay_amt > 0 then                                          
+           select AR_RECEIVE.PAYMENT_TYPE,     
+                  AR_RECEIVE.AR_ITEM,
+                  AR_RECEIVE.CUST_ATTR,   
+                  AR_RECEIVE.AR_AMT,   
+                  nvl(AR_RECEIVE.AR_REC_AMT,0)
+            into :ls_payment_type,
+                 :ls_ar_item,
+                 :ls_cust_attr,
+                 :ll_ar_amt,
+                 :ll_ar_recv_amt
+            from ar_receive
+           where cargo_location  =:ls_cargo_location
+             and start_date      =:ls_start_date
+             and end_date        =:ls_end_date
+             and custom_id       =:ls_register_no 
+             and virtual_account =:ls_virtual_account
+             and nvl(ar_amt,0) - nvl(ar_rec_amt,0) = :ll_ar_amt - :ll_ar_recv_amt
+           for update of AR_REC_AMT
+              ;                 
+           if ls_ar_item = '1' then  // 1.房電費繳款  2.倉租繳款
+               ls_acct_no = '1246'   // 房電費會計科目
+               ls_ar_type = '008' 
+           else 
+               // 倉租應收帳款科目
+               ls_acct_no = ''
+               
+               select acct_map.acct_no,
+                      ar.cust_attribute
+                 into :ls_acct_no,
+                      :ls_cust_attr
+                 from(
+                      select registered_customer.cargo_location cargo_location,
+                             registered_customer.cust_attribute cust_attribute,
+                             DECODE(NVL(registered_customer.flag_1221,'N'),'Y','1221','AR') ar_acct_no
+                        from registered_customer
+                       where registered_customer.cargo_location =:ls_cargo_location
+                         and registered_customer.register_no    =:ls_register_no
+                     )ar, acct_map
+                where ar.cargo_location = acct_map.cargo_location (+)
+                  and ar.ar_acct_no     = acct_map.charge_type    (+)
+                     ;
+               if ls_payment_type = 'W' or ls_payment_type = 'N' then ls_ar_type = '006'
+               if ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B') then ls_ar_type = '001'  // 一般 & 快遞客戶
+               if ls_payment_type = 'L' then ls_ar_type = '005'
+               if ls_cust_attr    = 'A' then ls_ar_type = '003'  // 航空公司
+               if ls_payment_type = 'K' then ls_ar_type = '002'
+               if ls_payment_type = 'M' then ls_ar_type = '004'                        
+           end if
+               
+           ls_auto_write = 'Y'
+           
+           if ls_cust_attr = 'B' or len(trim(ls_register_no)) > 4 then  // 快遞客戶不自動寫入使用額度沖銷處理
+               ls_auto_write = 'N'
+           end if
+                   
+           select count(*)
+             into :li_cnt
+             from ar_trade 
+            where cargo_location = :ls_cargo_location
+              and tran_date      = to_char(sysdate,'yyyymmdd')
+              and custom_id      = :ls_register_no
+              and ar_type        = :ls_ar_type
+              and tot_amount     = :ll_pay_amt
+              and bank_id        = '138'               
+                 ;
+           if isnull(li_cnt) then li_cnt = 0
+                                   
+           if li_cnt > 0 then
+               json.result 中加入 messagebox("訊息","在應收帳款收回作業已有重複資料，可能是財務部已自行輸入")
+               continue
+           else                        
+               if ll_pay_amt - (ll_ar_amt - ll_ar_recv_amt) >= 0 then
+                   ll_milus_amt = ll_ar_amt - ll_ar_recv_amt
+               else
+                   ll_milus_amt = ll_pay_amt
+               end if
+               
+               ls_temp = 'N'  // 是否要產生暫收款
+               if ll_non_rcv_cnt = ll_counter and ll_pay_amt > (ll_ar_amt - ll_ar_recv_amt) then //最後一家客戶且匯款金額大於未收帳款餘額,多出金額作暫收款
+                   ls_temp = 'Y' 
+                   // 入暫收款則不先沖銷客戶使用額度
+               else                                    
+                   // 不入暫收款 且檢核匯款金額 = 應收帳款金額 才可沖銷應收帳款
+                   if ls_post = 'Y' then
+                       update ar_receive
+                          set ar_rec_amt      = ar_rec_amt +:ll_milus_amt,
+                              virtual_account =:ls_virtual_account,
+                              remark          = '系統沖銷金額：' || to_char(:ll_milus_amt)
+                        where cargo_location  =:ls_cargo_location
+                          and start_date      =:ls_start_date
+                          and end_date        =:ls_end_date
+                          and custom_id       =:ls_register_no 
+                          and ar_amt - nvl(ar_rec_amt,0) = :ll_ar_amt - :ll_ar_recv_amt
+                             ;
+                       if sqlca.sqlnrows <= 0 then                               
+                            ls_err_text = sqlca.sqlerrtext
+                            rollback ;
+                            json.result 中加入 messagebox("錯誤","更新記帳客戶【"+ls_register_no+' '+ls_start_date+'～'+ls_end_date+"】應收帳款已收回金額失敗【"+ls_err_text+"】")
+                            continue
+                       end if
+                   end if
+               end if
+               
+               ls_seq = ''
+               select max(seq)
+                 into :ls_seq
+                 from ar_trade
+                where cargo_location =:ls_cargo_location
+                  and tran_date      =to_char(sysdate,'yyyymmdd')
+                     ;                     
+               if isnull(ls_seq) then ls_seq = '0'                     
+               ls_seq = mid(string(integer(ls_seq)+10001),2,4)
+               
+               ls_desc = ''
+               if ls_post = 'N' then
+                   if ll_ar_amt - ll_ar_recv_amt = ll_milus_amt then                                               
+                       ls_desc = '系統沖銷帳款，但部分客戶金額不符所以不過帳'
+                   else
+                       ls_desc = '系統沖銷帳款，但金額差＄' + string(ll_ar_amt - ll_ar_recv_amt - ll_milus_amt) + '不過帳'
+                   end if
+               end if
+               
+               insert into "AR_TRADE"
+                          ("AUTO",
+                           "CARGO_LOCATION",
+                           "TRAN_DATE",
+                           "SEQ",
+                           "START_DATE",
+                           "END_DATE",
+                           "CUSTOM_ID",
+                           "DB_FLAG",
+                           "TOT_AMOUNT",
+                           "AR_MILUS_AMT",
+                           "DET_OVER",
+                           "AR_OVER_AMT",
+                           "REMITTANCE_FEE",
+                           "BANK_ID",
+                           "BANK_ACCT_NO",
+                           "AR_DESC",
+                           "TR_RCV_FLAG",
+                           "TR_RCV_IN_ACCT_NO",
+                           "CLOSE_FLAG",
+                           "AR_ACCT_NO",
+                           "AR_TYPE",
+                           "AUTO_WRITE",
+                           "VIRTUAL_ACCOUNT",
+                           "UPD_USER",
+                           "UPD_DATE"
+                          )
+                    values('Y',
+                           :ls_cargo_location,
+                           to_char(sysdate,'yyyymmdd'),
+                           :ls_seq,
+                           :ls_start_date,
+                           :ls_end_date,
+                           :ls_register_no,
+                           'N',
+                           decode(:ls_temp,'Y',:ll_pay_amt,:ll_milus_amt),
+                           :ll_milus_amt,
+                           0,                                                                      
+                           decode(:ls_temp,'Y',:ll_pay_amt - :ll_milus_amt,0),
+                           0,                                                              
+                           '138',
+                           trim(:ls_bank_acct_no),
+                           decode(:ls_temp,'Y','匯款金額大於帳款，部分金額入暫收',decode(:ls_post,'N',:ls_desc,'系統沖銷帳款，金額相符自動過帳')),
+                           :ls_temp,                                                               
+                           decode(:ls_temp,'Y','2120000',null),
+                           decode(:ls_temp,'Y','N',:ls_post),
+                           :ls_acct_no,
+                           :ls_ar_type,
+                           :ls_auto_write,
+                           :ls_virtual_account,
+                           'SYSTEM',
+                           sysdate
+                          );
+               if sqlca.sqlcode <> 0 then
+                   ls_err_text = sqlca.sqlerrtext
+                   rollback ;
+                   json.result 中加入 messagebox("錯誤","虛擬帳號【"+ls_virtual_account+"】之銀行匯款沖銷金額寫入應收帳款收回資料失敗【"+ls_err_text+"】")
+                   continue                                
+               end if
+               
+               // 不入暫收款 且檢核匯款金額 = 應收帳款金額 才可釋放額度
+               if ls_temp = 'N' and ls_post = 'Y' then
+                   // 記帳客編為四碼才需沖銷使用額度&產生沖銷額度紀錄
+                   if len(trim(ls_register_no)) = 4 then   
+                       // 寫入額度沖銷資料檔案之金額
+                       // 找尋是否有共用額度記帳客編,若有則釋放共用額度記帳客編之剩餘可用額度                                  
+                       li_credit    = 0
+                       ls_credit_no = ''
+                       
+                       select credit_no    , cust_attribute, count(*)
+                         into :ls_credit_no, :ls_cust_attr , :li_credit
+                         from registered_customer
+                        where cargo_location =:ls_cargo_location
+                          and register_no    =:ls_register_no
+                       group by credit_no,
+                             cust_attribute 
+                            ;       
+                       if isnull(ls_credit_no) then ls_credit_no = ''
+                       if isnull(ls_cust_attr) then ls_cust_attr = ''
+                       if isnull(li_credit)    then li_credit    = 0                                      
+                       
+                       if ls_cust_attr <> 'B' then              // 快遞客戶不處理
+                           if len(trim(ls_credit_no)) > 0 then  // 有額度共用現象,則以額度共用客編沖銷使用額度
+                               ls_used_cust_id = ls_credit_no
+                               ls_memo         = '客戶:'+ls_register_no+" 共用"+ls_credit_no+"之額度"
+                           else
+                               ls_used_cust_id = ls_register_no
+                               ls_memo         = ''
+                           end if
+                       end if
+                       
+                       if len(ls_memo + "虛擬帳號:"+ls_virtual_account) <= 50 then 
+                           ls_memo = ls_memo + "虛擬帳號:"+ls_virtual_account
+                       end if
+                       
+                       if li_credit > 0 then  // 記帳客戶基本資料有此客戶                                                                                                
+                           // 檢查是否有相同之使用額度沖銷資料
+                           li_credit = 0
+                           select count(*)
+                             into :li_credit
+                             from credit_maintain
+                            where cargo_location =:ls_cargo_location
+                              and register_no    =:ls_used_cust_id
+                              and adjust_type    ='U'
+                              and adjust_date    =to_char(sysdate,'yyyymmdd')
+                              and calculate_type ='O'
+                              and start_date     =:ls_start_date
+                              and end_date       =:ls_end_date
+                              and adjust_vol     =:ll_milus_amt
+                                 ;
+                           if isnull(li_credit) then li_credit = 0
+                           if li_credit = 0 then
+                               select credit_vol, used_vol  , temp_vol
+                                 into :ll_b_vol1, :ll_b_vol2, :ll_b_vol3
+                                 from registered_customer
+                                where cargo_location =:ls_cargo_location
+                                  and register_no    =:ls_used_cust_id
+                               for update of used_vol
+                                  ;
+                               if isnull(ll_b_vol1) then ll_b_vol1 = 0
+                               if isnull(ll_b_vol2) then ll_b_vol2 = 0
+                               if isnull(ll_b_vol3) then ll_b_vol3 = 0
+                                                                                       
+                               f_get_date(l_dt)
+                               
+                               do while true
+                                   select sysdate
+                                     into :ldt_now
+                                     from dual ;
+                                   
+                                   if ldt_now > l_dt then
+                                       l_dt = ldt_now
+                                       exit
+                                   end if
+                               loop
+                               
+                               insert into CREDIT_MAINTAIN
+                                          ("CARGO_LOCATION",   
+                                           "REGISTER_NO",   
+                                           "ADJUST_TYPE",   
+                                           "ADJUST_DATE",   
+                                           "ADJUST_VOL",                                                                                                                                              
+                                           "CALCULATE_TYPE",   
+                                           "UPD_USER",    
+                                           "UPD_DATE",   
+                                           "B_CREDIT_VOL",   
+                                           "A_CREDIT_VOL",   
+                                           "B_USED_VOL",   
+                                           "A_USED_VOL",   
+                                           "B_TEMP_VOL",   
+                                           "A_TEMP_VOL",   
+                                           "START_DATE",   
+                                           "END_DATE",   
+                                           "DET_SEQ",
+                                           "ORG_REGISTER_NO",
+                                           "MEMO_DESC")
+                                    values(:ls_cargo_location,
+                                           :ls_used_cust_id,
+                                           'U',
+                                           to_char(sysdate,'yyyymmdd'),
+                                           :ll_milus_amt,
+                                           'O',
+                                           'SYSTEM',
+                                           sysdate,
+                                           :ll_b_vol1,
+                                           :ll_b_vol1,
+                                           :ll_b_vol2,
+                                           :ll_b_vol2 - :ll_milus_amt,
+                                           :ll_b_vol3,
+                                           :ll_b_vol3,
+                                           :ls_start_date,
+                                           :ls_end_date,
+                                           :ls_seq,
+                                           decode(:ls_used_cust_id,:ls_register_no,null,:ls_register_no),
+                                           :ls_memo 
+                                          );                                                                                                        
+                               if sqlca.sqlcode <> 0 then 
+                                   ls_err_text = sqlca.sqlerrtext
+                                   rollback ;
+                                   json.result 中加入 messagebox('錯誤','記帳客戶【'+ls_register_no+'】寫入客戶沖銷使用額度檔失敗 '+ls_err_text)
+                                   continue
+                               end if                                                                                                  
+                               
+                               update registered_customer
+                                  set used_vol       =:ll_b_vol2 - :ll_milus_amt
+                                where cargo_location =:ls_cargo_location
+                                  and register_no    =:ls_used_cust_id  
+                                     ;  
+                               if sqlca.sqlnrows <= 0 then
+                                   ls_err_text = sqlca.sqlerrtext
+                                   rollback ;
+                                   json.result 中加入 messagebox("錯誤","釋放記帳客戶【'+ls_register_no+'】可用額度失敗【"+ls_err_text+"】")
+                                   continue
+                               end if                                  
+                           else
+                               json.result 中加入 messagebox('訊息','客服組已輸入【客戶:'+ls_register_no+'】使用額度沖銷資料，系統不再自動寫入')
+                               continue
+                           end if
+                       end if
+                       // 記帳客編為四碼才需沖銷使用額度&產生沖銷額度紀錄                               
+                   end if
+               end if
+               
+               if ll_non_rcv_cnt = ll_counter then  // 最後一家客戶且匯款金額大於未收帳款餘額,多出金額作暫收款
+                   ll_pay_amt = 0
+               else
+                   ll_pay_amt -= ll_milus_amt
+               end if                          
+           end if  
+       end if
+   loop    
+   close AR_RECEIVE;
+   
+   if ll_pay_amt = 0 then  // 表示在應收帳款檔案 一筆都找不到對應記帳客戶資料可沖銷
+       update CUST_REMITTANCE
+          set status   = 'F',
+              err_desc = decode(:ls_post,'N','系統沖銷帳款，但金額不符不予過帳',' ')
+        where "CUST_REMITTANCE"."TYPE" || TRIM("CUST_REMITTANCE"."PR_KEY1") =:ls_virtual_account    
+          and trim("CUST_REMITTANCE"."USERID")                              = '70759575'
+          and "CUST_REMITTANCE"."STATUS"                                    = 'N'
+             ;                                             
+       if sqlca.sqlnrows <= 0 then
+           ls_err_text = sqlca.sqlerrtext
+           rollback ;
+           json.result 中加入 messagebox("錯誤","更新銀行匯款記錄檔 CUST_REMITTANCE 沖銷完成註記 失敗【"+ls_err_text+"】")
+           continue
+       end if  
+   else        
+       open CUST_VIRTUAL_ACCOUNT ;
+       do while ll_pay_amt > 0
+           fetch CUST_VIRTUAL_ACCOUNT 
+            into :ls_cargo_location,
+                 :ls_register_no,
+                 :ls_bank_acct_no
+                ;
+           if sqlca.sqlcode <> 0 then exit                         
+           
+           ls_seq = ''
+           select max(seq)
+             into :ls_seq
+             from ar_trade
+            where cargo_location =:ls_cargo_location
+              and tran_date      =to_char(sysdate,'yyyymmdd')
+                 ;                     
+           if isnull(ls_seq) then ls_seq = '0'
+           ls_seq = mid(string(integer(ls_seq)+10001),2,4)                 
+           
+           // 找出虛擬帳號對應記帳客編 最近一次帳款起訖區間 寫入暫收款
+           select max(start_date || end_date || payment_type)
+             into :ls_end_date
+             from charge_sum
+            where cargo_location =:ls_cargo_location
+              and customer_id    =:ls_register_no
+                 ;
+           if isnull(ls_end_date) then ls_end_date = ''                             
+           
+           if len(trim(ls_end_date)) < 17 then     
+               select max(start_date || end_date || payment_type)
+                 into :ls_end_date
+                 from ar_receive
+                where cargo_location =:ls_cargo_location
+                  and custom_id      =:ls_register_no
+                     ;      
+               if isnull(ls_end_date) then ls_end_date = ''                                              
+           end if          
+           
+           if len(trim(ls_end_date)) < 17 then
+               // 找出記帳客戶付款方式,再用此付款方式找出其他客戶相同付款方式最近結帳起迄日期
+               select decode(payment_type_i,null,payment_type_o,'C',payment_type_o,payment_type_i)
+                 into :ls_payment_type
+                 from registered_customer
+                where registered_customer.cargo_location =:ls_cargo_location
+                  and registered_customer.register_no    =:ls_register_no 
+                     ;
+               select max(start_date || end_date || :ls_payment_type)                          
+                 into :ls_end_date
+                 from ar_receive
+                where cargo_location =:ls_cargo_location
+                  and payment_type   =:ls_payment_type
+                     ;        
+               if isnull(ls_end_date) then ls_end_date = ''
+           end if
+           
+           if len(trim(ls_end_date)) < 17 then continue
+           
+           ls_payment_type = mid(ls_end_date,17,1)
+           ls_start_date   = mid(ls_end_date,1,8)
+           ls_end_date     = mid(ls_end_date,9,8)
+                                   
+           // 倉租應收帳款科目
+           ls_acct_no = ''
+           select acct_map.acct_no,
+                  ar.cust_attribute
+             into :ls_acct_no,
+                  :ls_cust_attr
+             from(
+                  select registered_customer.cargo_location                             cargo_location,
+                         registered_customer.cust_attribute                             cust_attribute,
+                         DECODE(NVL(registered_customer.flag_1221,'N'),'Y','1221','AR') ar_acct_no
+                    from registered_customer
+                   where registered_customer.cargo_location =:ls_cargo_location
+                     and registered_customer.register_no    =:ls_register_no
+                 )ar, acct_map
+            where ar.cargo_location = acct_map.cargo_location (+)
+              and ar.ar_acct_no     = acct_map.charge_type    (+)
+                 ;
+           if ls_payment_type = 'W' or ls_payment_type = 'N' then ls_ar_type = '006'
+           if ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B') then ls_ar_type = '001'  // 一般 & 快遞客戶
+           if ls_payment_type = 'L' then ls_ar_type = '005'
+           if ls_cust_attr    = 'A' then ls_ar_type = '003'  // 航空公司
+           if ls_payment_type = 'K' then ls_ar_type = '002'
+           if ls_payment_type = 'M' then ls_ar_type = '004'                        
+           // if ls_cust_attr = 'B' or len(trim(ls_register_no)) > 4 then  // 快遞客戶不自動寫入使用額度沖銷處理
+               // ls_auto_write = 'N'
+           // end if                          
+                            
+           insert into "AR_TRADE"
+                      ("AUTO",
+                       "CARGO_LOCATION",
+                       "TRAN_DATE",
+                       "SEQ",
+                       "START_DATE",
+                       "END_DATE",
+                       "CUSTOM_ID",
+                       "DB_FLAG",
+                       "TOT_AMOUNT",
+                       "AR_MILUS_AMT",
+                       "DET_OVER",
+                       "AR_OVER_AMT",
+                       "REMITTANCE_FEE",
+                       "BANK_ID",
+                       "BANK_ACCT_NO",
+                       "AR_DESC",
+                       "TR_RCV_FLAG",
+                       "CLOSE_FLAG",
+                       "AR_ACCT_NO",
+                       "TR_RCV_IN_ACCT_NO",
+                       "AR_TYPE",
+                       "AUTO_WRITE",
+                       "VIRTUAL_ACCOUNT",
+                       "UPD_USER",
+                       "UPD_DATE" )
+                values('Y',
+                       :ls_cargo_location,
+                       to_char(sysdate,'yyyymmdd'),
+                       :ls_seq,
+                       :ls_start_date,
+                       :ls_end_date,
+                       :ls_register_no,
+                       'N',
+                       :ll_pay_amt,
+                       0,
+                       0,                                                                      
+                       :ll_pay_amt,
+                       0,                                                              
+                       '138',
+                       trim(:ls_bank_acct_no),
+                       '無對應客戶帳款可沖銷，先入暫收款',
+                       'Y',
+                       'N',
+                       :ls_acct_no,
+                       '2120000',
+                       :ls_ar_type,
+                       :ls_auto_write,
+                       :ls_virtual_account,
+                       'SYSTEM',
+                       sysdate
+                      ) ;
+           if sqlca.sqlcode <> 0 then
+               ls_err_text = sqlca.sqlerrtext
+               rollback ;
+               json.result 中加入 messagebox("錯誤","虛擬帳號【"+ls_virtual_account+"】之銀行匯款沖銷金額寫入應收帳款收回資料失敗【"+ls_err_text+"】")
+               continue                                
+           end if  
+           
+           ll_pay_amt = 0
+           
+           update CUST_REMITTANCE
+              set status   = 'F',
+                  err_desc = '比對後無符合客戶帳款可沖銷先入暫收'
+            where "CUST_REMITTANCE"."TYPE" || TRIM("CUST_REMITTANCE"."PR_KEY1") =:ls_virtual_account    
+              and trim("CUST_REMITTANCE"."USERID")                              = '70759575'
+              and "CUST_REMITTANCE"."STATUS"                                    = 'N'
+                 ;                                             
+           if sqlca.sqlnrows <= 0 then
+               ls_err_text = sqlca.sqlerrtext
+               rollback ;
+               json.result 中加入 messagebox("錯誤","更新銀行匯款記錄檔 CUST_REMITTANCE 沖銷註記 失敗【"+ls_err_text+"】")
+               continue
+           end if  
+       loop            
+       close CUST_VIRTUAL_ACCOUNT ;
+       
+       if ll_pay_amt > 0 then                  
+           update CUST_REMITTANCE
+              set status   = 'H',
+                  err_desc = '無符合客戶帳款可沖銷或入暫收款，建議人工處理'
+            where "CUST_REMITTANCE"."TYPE" || TRIM("CUST_REMITTANCE"."PR_KEY1") =:ls_virtual_account    
+              and trim("CUST_REMITTANCE"."USERID")                              = '70759575'
+              and "CUST_REMITTANCE"."STATUS"                                    = 'N'
+                 ;                                             
+           if sqlca.sqlnrows <= 0 then
+               ls_err_text = sqlca.sqlerrtext
+               rollback ;
+               json.result 中加入 messagebox("錯誤","更新銀行匯款記錄檔 CUST_REMITTANCE 處理註記 失敗【"+ls_err_text+"】")
+               continue
+           end if  
+       end if
+   end if  
+loop
+close CUST_REMITTANCE ;
+commit ;
+
+return json
+
+
+
+
+json import_excel(File excel);
+string  docname, named, ls_value1, ls_value2, ls_value3, ls_value3_temp, ls_compare_date
+string  ls_cargo, ls_start_date, ls_end_date, ls_custom_id, ls_payment_type, ls_cust_name, ls_ar_item, ls_strange_str
+
+integer value,Return_Value, ii_ExcelWindowState = 1, li_sel, li_cnt, li_s, li_find_similar, li_position, li_dupl_row, li_asc
+
+long    li_insert_row, ll_erow, ll_process_rows
+long    ll_left_amt
+
+any     lany_value1, lany_value2, lany_value3
+
+boolean lb_found
+
+OLEobject export_object
+export_object = Create OLEobject
+連結 excel
+
+讀取 excel
+export_object.Workbooks.Open(filename)
+
+ll_erow = 1
+
+dw_error.title = '轉檔比對結果視窗'
+  
+ll_process_rows = 0  
+
+declare find_cust_name cursor for
+    select register_no
+      from registered_customer
+     where cargo_location in ('C','K')
+       and (full_name like '%' || :ls_cust_name || '%' or 
+            custom_name like '%' || :ls_cust_name || '%' )
+          ;      
+// st_process_text.visible = true
+
+select to_char(sysdate - 730,'yyyymmdd')
+  into :ls_compare_date
+  from dual ;
+  
+do while true
+    lany_value1=export_object.ActiveSheet.Range("C"+string(ll_erow)).value  // 入帳日期     舊版本 E
+    lany_value2=export_object.ActiveSheet.Range("F"+string(ll_erow)).value  // 繳款金額     舊版本 J   
+    lany_value3=export_object.ActiveSheet.Range("H"+string(ll_erow)).value  // 繳款單序號   舊版本 N
+    
+    if isnull(lany_value1) then lany_value1 = ''
+    if isnull(lany_value2) then lany_value2 = 0
+    if isnull(lany_value3) then lany_value3 = ''
+    
+    ls_value1 = trim(string(lany_Value1))
+    ls_value2 = string(lany_Value2)
+    ls_value3 = trim(string(lany_Value3))
+    
+    // 銀行提供Excel檔案中 金額欄位屬性為字元,但卻使用千分位符號
+    // 以下將千分位符號',' 清除
+    do while true
+        li_position = pos(ls_value2,',')
+        
+        if li_position > 0 then 
+            ls_value2 = substr(ls_value2,1,li_position -1) + substr(ls_value2,li_position + 1)
+        else
+            exit
+        end if
+    loop
+                            
+    ll_process_rows ++
+    
+    if len(trim(ls_value1)) = 0 or long(ls_value2) = 0 or len(ls_value3) = 0 then           
+        st_process_text.text = '讀取Excel檔案第'+string(ll_erow)+"筆資料為空白"
+        if ll_process_rows >= 10 then exit
+    else
+        ll_process_rows = 0
+    end if
+    
+    st_process_text.text = '讀取第'+string(ll_erow)+'筆資料:'+ls_value3
+    
+    if ls_value1 = '' and long(ls_value2) = 0 and ls_value3 = '' then 
+        do nothing
+    else
+        li_cnt = 0
+        
+        // 找出繳款單號 or 發票號碼起始位置
+        ls_value3_temp = trim(upper(ls_value3))    
+        
+        if pos(ls_value3_temp,'CA') > 0 then
+            // ls_value3_temp = substr(ls_value3_temp,pos(ls_value3_temp,'CA'))
+        elseif pos(ls_value3_temp,'BF') > 0 then
+            // ls_value3_temp = substr(ls_value3_temp,pos(ls_value3_temp,'BF'))           
+        end if
+        
+        lb_found = false
+        
+        choose case len(trim(ls_value3_temp))
+               case 10  // 房電費發票編號
+                    if len(ls_value3_temp) > 0 then
+                        li_cnt        = 0
+                        ll_left_amt   = 0                               
+                        ls_start_date = ''
+                        ls_end_date   = ''
+                        ls_ar_item    = ''
+                        ls_cargo      = ''
+                        
+                        select cargo_location,
+                               start_date,
+                               end_date,
+                               payment_type,                          
+                               ar_item,
+                               sum(ar_amt - nvl(ar_rec_amt,0)),
+                               count(*)
+                          into :ls_cargo,
+                               :ls_start_date,
+                               :ls_end_date,
+                               :ls_payment_type,
+                               :ls_ar_item,
+                               :ll_left_amt,
+                               :li_cnt
+                          from ar_receive
+                         where custom_id =:ls_value3_temp
+                        group by cargo_location,
+                                 start_date,
+                                 end_date,
+                                 payment_type,                          
+                                 ar_item
+                                ;
+                        if isnull(ll_left_amt)     then ll_left_amt     = 0
+                        if isnull(li_cnt)          then li_cnt          = 0
+                        if isnull(ls_start_date)   then ls_start_date   = ''    
+                        if isnull(ls_end_date)     then ls_end_date     = ''    
+                        if isnull(ls_payment_type) then ls_payment_type = ''
+                        if isnull(ls_ar_item)      then ls_ar_item      = ''                                            
+                        
+                        if ll_left_amt > 0 and ll_left_amt = long(ls_value2) then 
+                            li_insert_row = dw_error.insertrow(0)    
+                            
+                            依 dw_error_T 之格式加入一筆 json
+                            筆數為 li_insert_row
+                            將下列資料寫入該筆 json
+                                                           
+                            dw_error_T_li_insert_row.tran_date      = ls_value1
+                            dw_error_T_li_insert_row.amt            = long(ls_value2)
+                            dw_error_T_li_insert_row.seqno          = ls_value3
+                            dw_error_T_li_insert_row.status         = 'V'
+                            dw_error_T_li_insert_row.start_date     = ls_start_date
+                            dw_error_T_li_insert_row.end_date       = ls_end_date
+                            dw_error_T_li_insert_row.payment_type   = ls_payment_type
+                            dw_error_T_li_insert_row.custom_id      = upper(ls_value3)
+                            dw_error_T_li_insert_row.cargo_location = ls_cargo
+                            dw_error_T_li_insert_row.ar_item        = ls_ar_item                                            
+                            
+                            lb_found = true
+                        else
+                            if li_cnt > 0 then                                                      
+                                li_insert_row = dw_error.insertrow(0)
+                                
+                                依 dw_error_T 之格式加入一筆 json
+                                筆數為 li_insert_row
+                                將下列資料寫入該筆 json                                   
+                                
+                                dw_error_T_li_insert_row.tran_date = ls_value1
+                                dw_error_T_li_insert_row.amt       = long(ls_value2)
+                                dw_error_T_li_insert_row.seqno     = ls_value3
+                                dw_error_T_li_insert_row.status    = 'X'
+                                dw_error_T_li_insert_row.desc      = '未收回金額與銀行繳款金額不符'
+                                
+                                lb_found = true                   
+                            end if
+                        end if
+                    end if
+               case 11  // 倉租繳款單號 
+                    if asc(substr(ls_value3_temp,1,1)) >= 65 and asc(substr(ls_value3_temp,1,1)) <= 90 and
+                       asc(substr(ls_value3_temp,2,1)) >= 65 and asc(substr(ls_value3_temp,2,1)) <= 90 then 
+
+                        // 用繳款單號找發票檔案之客戶 帳款起訖日期 現開客戶開立多張發票之繳款單號相同        
+                        
+                        li_insert_row = dw_error.insertrow(0)
+                        
+                        依 dw_error_T 之格式加入一筆 json
+                        筆數為 li_insert_row
+                        將下列資料寫入該筆 json
+                        
+                        dw_error_T_li_insert_row.tran_date = ls_value1
+                        dw_error_T_li_insert_row.amt       = long(ls_value2)
+                        dw_error_T_li_insert_row.seqno     = ls_value3  
+                                                             
+                        ls_start_date    = ''
+                        ls_end_date      = ''
+                        ls_payment_type  = ''
+                        ls_cargo         = ''
+                    
+                        select decode(custom_id,NULL,agent_code,custom_id) custom_id,
+                               payment_type  ,
+                               cargo_location
+                          into :ls_custom_id,
+                               :ls_payment_type,
+                               :ls_cargo
+                          from invoice_master
+                         where slip_seqno     = substr(:ls_value3_temp,3)
+                           and cargo_location = decode(substr(:ls_value3,1,2),'CA','C','K')
+                           and status        <> 'C' 
+                        group by decode(custom_id,NULL,agent_code,custom_id),
+                                 payment_type,
+                                 cargo_location
+                                ;
+                        if isnull(ls_custom_id)    then ls_custom_id    = ''    
+                        if isnull(ls_payment_type) then ls_payment_type = ''
+                        if isnull(ls_cargo)        then ls_cargo        = ''    
+                        
+                        // 找應收帳款資料檔案之金額 比對
+                        select start_date,
+                               end_date,
+                               ar_item,
+                               count(*)
+                          into :ls_start_date,
+                               :ls_end_date,
+                               :ls_ar_item,
+                               :li_cnt
+                          from ar_receive
+                         where cargo_location =:ls_cargo
+                           and payment_type   =:ls_payment_type
+                           and custom_id      =:ls_custom_id 
+                           and ar_amt - nvl(ar_over_amt,0) - nvl(ar_rec_amt,0) = to_number(:ls_value2)
+                        group by start_date,
+                                 end_date,
+                                 ar_item
+                                ;
+                        if isnull(ls_start_date) then ls_start_date = ''        
+                        if isnull(ls_end_date)   then ls_end_date   = ''                
+                        if isnull(ls_ar_item)    then ls_ar_item    = ''        
+                        if isnull(li_cnt)        then li_cnt        = 0
+                        if li_cnt > 0 then 
+                            寫入目前 json 中 li_insert_row
+                        
+                            dw_error_T_li_insert_row.status         = 'V'                            
+                            dw_error_T_li_insert_row.start_date     = ls_start_date
+                            dw_error_T_li_insert_row.end_date       = ls_end_date
+                            dw_error_T_li_insert_row.payment_type   = ls_payment_type
+                            dw_error_T_li_insert_row.custom_id      = ls_custom_id
+                            dw_error_T_li_insert_row.cargo_location = ls_cargo                      
+                            dw_error_T_li_insert_row.ar_item        = ls_ar_item    
+                            
+                            li_dupl_row = dw_error.find("start_date='"+ls_start_date+"' and end_date='"+ls_end_date+"' and custom_id='"+ls_custom_id+"' " + 
+                                                        "and cargo_location='"+ls_cargo+"' and ar_item='"+ls_ar_item+"' and amt="+string(long(ls_value2)),1,dw_error.rowcount())
+                            // 自 dw_error_T 第一筆向後尋找 start_date = ls_start_date and end_date = ls_end_date and custom_id = ls_custom_id 
+                            //                                                         and cargo_location = ls_cargo and ar_item = ls_ar_item and amt = string(long(ls_value2))
+                            // 回傳符合條件之第一筆資料筆數位置
+                            
+                            if li_dupl_row > 0 and li_dupl_row <> li_insert_row then
+                                寫入目前 json 中 li_insert_row                                                                                          
+                                
+                                dw_error_T_li_insert_row.desc   = '重複!!，已有相同資料'   
+                                dw_error_T_li_insert_row.status = 'D'            
+                            end if                  
+                        else                                        
+                            select count(*)
+                              into :li_cnt
+                              from ar_receive
+                             where cargo_location =:ls_cargo
+                               and payment_type   =:ls_payment_type
+                               and custom_id      =:ls_custom_id 
+                               and ar_amt - nvl(ar_over_amt,0) - nvl(ar_rec_amt,0) > 0
+                                  ;
+                            if li_cnt > 0 then 
+                                寫入目前 json 中 li_insert_row                             
+                                
+                                dw_error_T_li_insert_row.status = 'X'
+                                dw_error_T_li_insert_row.desc   = '未收回金額與銀行繳款金額不符' 
+                            else
+                                寫入目前 json 中 li_insert_row
+                                
+                                dw_error_T_li_insert_row.status = 'X'            
+                                dw_error_T_li_insert_row.desc   = '倉租應收帳款無此筆資料'                    
+                            end if
+                        end if                  
+                        lb_found = true
+                    end if                  
+        end choose
+        
+        if not lb_found then
+            // 找應收帳款資料檔案之金額 比對
+            li_s = 1
+            do while li_s <= len(ls_value3) 
+                ls_strange_str = substr(ls_value3,li_s,1)
+                choose case ls_strange_str
+                       case '&','@','#','$','%','*','(',')','.'
+                            ls_value3 = substr(ls_value3,1,li_s - 1)
+                            exit
+                end choose
+                li_s ++
+            loop
+                        
+            if len(trim(ls_value3)) > 6 then
+                ls_cust_name = substr(ls_value3,1,6)
+            else
+                ls_cust_name = substr(ls_value3,1,len(ls_value3))
+            end if
+            
+            ll_left_amt     = long(ls_value2)
+                                                   
+            li_insert_row   = dw_error.insertrow(0)
+
+            依 dw_error_T 之格式加入一筆 json
+            筆數為 li_insert_row
+            將下列資料寫入該筆 json            
+            
+            dw_error_T_li_insert_row.tran_date = ls_value1
+            dw_error_T_li_insert_row.amt       = long(ls_value2)
+            dw_error_T_li_insert_row.seqno     = ls_value3
+            
+            open find_cust_name ;
+            do while true
+                ls_custom_id    = ''
+                ls_start_date   = ''
+                ls_end_date     = ''
+                ls_payment_type = ''
+                ls_cargo        = ''    
+                
+                fetch find_cust_name
+                 into :ls_custom_id ;
+                if sqlca.sqlcode <> 0 then exit                                  
+                
+                if isnull(ls_custom_id) then ls_custom_id = ''
+                
+                select start_date,
+                       end_date,
+                       payment_type,
+                       cargo_location,
+                       ar_item
+                  into :ls_start_date,
+                       :ls_end_date,
+                       :ls_payment_type,
+                       :ls_cargo,
+                       :ls_ar_item
+                  from ar_receive
+                 where cargo_location in ('C','K')
+                   and custom_id      =:ls_custom_id
+                   and ar_amt - nvl(ar_over_amt,0) - nvl(ar_rec_amt,0) =:ll_left_amt
+                      ;  
+                if isnull(ls_start_date)   then ls_start_date   = ''    
+                if isnull(ls_end_date)     then ls_end_date     = ''    
+                if isnull(ls_payment_type) then ls_payment_type = ''    
+                if isnull(ls_cargo)        then ls_cargo        = ''    
+                if isnull(ls_ar_item)      then ls_ar_item      = ''    
+                
+                if len(trim(ls_start_date)) > 0   and len(trim(ls_end_date)) > 0 and &
+                    len(trim(ls_payment_type)) > 0 and len(trim(ls_cargo)) > 0 then
+                    
+                    寫入目前 json 中 li_insert_row 
+                    
+                    dw_error_T_li_insert_row.status         = '?'    
+                    dw_error_T_li_insert_row.desc           = '倉租應收帳款找到類似資料客戶'
+                    dw_error_T_li_insert_row.start_date     = ls_start_date
+                    dw_error_T_li_insert_row.end_date       = ls_end_date
+                    dw_error_T_li_insert_row.payment_type   = ls_payment_type
+                    dw_error_T_li_insert_row.custom_id      = ls_custom_id                
+                    dw_error_T_li_insert_row.cargo_location = ls_cargo       
+                    dw_error_T_li_insert_row.ar_item        = ls_ar_item    
+                    
+                    exit
+                end if  
+            loop                            
+            close find_cust_name;
+            
+            if len(trim(ls_start_date)) = 0 or len(trim(ls_end_date)) = 0 or
+               len(trim(ls_payment_type)) = 0 and len(trim(ls_cargo)) = 0    then
+                ls_custom_id    = ''
+                li_find_similar = 0
+                
+                select count(*)
+                  into :li_find_similar
+                  from ar_receive
+                 where cargo_location in ('C','K')
+                   and start_date >=: ls_compare_date
+                   and ar_amt - nvl(ar_over_amt,0) - nvl(ar_rec_amt,0) =:ll_left_amt
+                      ;
+                if isnull(li_find_similar) then li_find_similar = 0
+                
+                if li_find_similar = 1 then
+                    select custom_id,
+                           start_date,
+                           end_date,
+                           payment_type,
+                           cargo_location,
+                           ar_item
+                      into :ls_custom_id,
+                           :ls_start_date,
+                           :ls_end_date,
+                           :ls_payment_type,
+                           :ls_cargo,
+                           :ls_ar_item
+                      from ar_receive
+                     where cargo_location in ('C','K')
+                       and start_date >=: ls_compare_date
+                       and ar_amt - nvl(ar_over_amt,0) - nvl(ar_rec_amt,0) =:ll_left_amt
+                          ;  
+                    寫入目前 json 中 li_insert_row       
+                         
+                    dw_error_T_li_insert_row.status         = '?'    
+                    dw_error_T_li_insert_row.desc           = '倉租應收帳款找到類似資料客戶'
+                    dw_error_T_li_insert_row.start_date     = ls_start_date
+                    dw_error_T_li_insert_row.end_date       = ls_end_date
+                    dw_error_T_li_insert_row.payment_type   = ls_payment_type
+                    dw_error_T_li_insert_row.custom_id      = ls_custom_id              
+                    dw_error_T_li_insert_row.cargo_location = ls_cargo    
+                    dw_error_T_li_insert_row.ar_item        = ls_ar_item    
+                else
+                    寫入目前 json 中 li_insert_row
+                    
+                    dw_error_T_li_insert_row.status = 'X'
+                    dw_error_T_li_insert_row.desc   = '倉租應收帳款找不到類似資料'
+                end if
+            end if
+        end if
+    end if
+    ll_erow ++  // 讀下一筆資料
+loop
+
+// st_process_text.visible = false
+// 跳離Excel
+export_object.quit()
+export_object.DisconnectObject()
+DESTROY export_object
+
+return json
+
+
+
+
+json write_ar_trade (str bank_id, json dw_error_T);
+integer l_i, li_insert_row, li_cnt, li_agent
+long    ll_amt
+string  ls_bank_id, ls_start_date, ls_end_date, ls_payment_type, ls_custom_id, ls_cargo, ls_desc
+string  ls_tran_date, ls_bank_acct_no, ls_acct_no, ls_ar_item, ls_cust_attr, ls_ar_type
+
+ls_bank_id = dw_post_data.getitemstring(1,'bank_id')
+
+for l_i = 1 to dw_error_T.rowcount()
+    if dw_error_T_l_i.status = 'V' then  // 相符才轉入     
+        ls_cargo        = dw_error_T_l_i.cargo_location
+        ls_desc         = dw_error_T_l_i.seqno
+        ls_tran_date    = dw_error_T_l_i.tran_date
+        ll_amt          = dw_error_T_l_i.amt
+        ls_start_date   = dw_error_T_l_i.start_date
+        ls_end_date     = dw_error_T_l_i.end_date
+        ls_custom_id    = dw_error_T_l_i.custom_id
+        ls_payment_type = dw_error_T_l_i.payment_type
+        ls_ar_item      = dw_error_T_l_i.ar_item      
+                
+        if f_chk_fdate(ls_tran_date) <> 0 then continue
+        
+        select acct_no
+          into :ls_bank_acct_no
+          from acct_map
+         where cargo_location =:ls_cargo
+           and charge_type    =:ls_bank_id
+              ;
+        if ls_ar_item = '1' then  // 1.房電費繳款  2.倉租繳款
+            ls_acct_no = '1246'   // 房電費會計科目
+            ls_ar_type = '008' 
+        else
+            // 倉租應收帳款科目
+            ls_acct_no   = ''
+            ls_cust_attr = 'N'
+            if len(trim(ls_custom_id)) = 3 then
+                li_agent = 0
+                
+                select count(*)
+                  into :li_agent
+                  from agent
+                 where agent_code =:ls_custom_id
+                      ;
+                if isnull(li_agent) then li_agent = 0
+                
+                if li_agent > 0 then ls_cust_attr = 'A'
+            else
+                select acct_map.acct_no,
+                       ar.cust_attribute
+                  into :ls_acct_no,
+                       :ls_cust_attr
+                  from(
+                       select registered_customer.cargo_location                             cargo_location,
+                              registered_customer.cust_attribute                             cust_attribute,
+                              DECODE(NVL(registered_customer.flag_1221,'N'),'Y','1221','AR') ar_acct_no
+                         from registered_customer
+                        where registered_customer.cargo_location =:ls_cargo
+                          and registered_customer.register_no    =:ls_custom_id
+                      )ar, acct_map
+                 where ar.cargo_location = acct_map.cargo_location (+)
+                   and ar.ar_acct_no     = acct_map.charge_type    (+)
+                      ;
+                if isnull(ls_cust_attr) then ls_cust_attr = ''
+            end if
+            
+            if ls_payment_type = 'W' or  ls_payment_type = 'N' then ls_ar_type = '006'
+            if ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B') then ls_ar_type = '001'  // 一般 & 快遞客戶
+            if ls_payment_type = 'L' then ls_ar_type = '005'
+            if ls_cust_attr    = 'A' then ls_ar_type = '003'  // 航空公司
+            if ls_payment_type = 'K' then ls_ar_type = '002'
+            if ls_payment_type = 'M' then ls_ar_type = '004'                        
+        end if
+                
+        select count(*)
+          into :li_cnt
+          from ar_trade 
+         where cargo_location =:ls_cargo
+           and tran_date      =:ls_tran_date
+           and custom_id      =:ls_custom_id
+           and ar_type        =:ls_ar_type
+           and tot_amount     =:ll_amt
+           and bank_id        =:ls_bank_id                 
+              ;
+        if isnull(li_cnt) then li_cnt = 0
+        
+        if li_cnt = 0 then                                                      
+            // 新增一筆 dw_free 資料
+            依 dw_free 之格式加入 json 中
+            
+            dw_free.auto           = 'Y'           // 系統轉入
+            dw_free.cargo_location = ls_cargo 
+            dw_free.tran_date      = ls_tran_date
+            dw_free.start_date     = ls_start_date
+            dw_free.end_date       = ls_end_date
+            dw_free.custom_id      = ls_custom_id 
+            dw_free.db_flag        = 'N'
+            dw_free.tot_amount     = ll_amt        // 收回金額 
+            dw_free.ar_milus_amt   = ll_amt        // 沖銷金額
+            dw_free.det_over       = 0             // 沖暫收額
+            dw_free.ar_over_amt    = 0             // 暫收金額
+            dw_free.remittance_fee = 0             // 郵匯費
+            dw_free.bank_id        = ls_bank_id
+            dw_free.bank_acct_no   = trim(ls_bank_acct_no)
+            dw_free.ar_desc        = substr(trim(ls_desc),1,60)
+            dw_free.tr_rcv_flag    = 'N'        
+            dw_free.close_flag     = 'N' 
+            dw_free.ar_acct_no     = trim(ls_acct_no)  // 應收帳款會計科目                 
+            dw_free.ar_type        = ls_ar_type            
+            
+            if ls_cust_attr = 'B' or len(trim(ls_custom_id)) > 4 then  // 快遞客戶不自動寫入使用額度沖銷處理
+                dw_free.auto_write = 'N' 
+            else
+                dw_free.auto_write = 'Y' 
+            end if               
+            
+            call API AR_TRADE_INS(json dw_free)   
+            
+            json.new_cnt = 新增筆數 ( 計算 call API AR_AR_TRADE_INS(json dw_free) 之次數 )
+            
+            dw_error_T_l_i.result  = '寫入收回資料檔正常'                      
+        else                                    
+            dw_error_T_l_i.result' = '收回資料檔已有相同資料'
+        end if
+    end if
+next
+
+return json 內含更新後之 dw_error_T 及 json.new_cnt
+
+
+
+
+json retrieve_det_seq(str cargo_location, str dw_free 中，特定資料筆數之 custom_id);
+// 找出 customs_id 所對應之 det_seq
+json = call API det_seq_P(str cargo_location, str custom_id)
+return json
+end subroutine
+
+
+
+
+long find_seq (str arg_cargo_location, str arg_tran_date, long arg_seq_no);
+long ll_find_start, ll_find_rows, ll_seq
+long ll_compare_seq
+
+ll_compare_seq = arg_seq_no
+ll_find_start  = 1
+
+do while true
+    ll_find_rows = 0
+    ll_find_rows = dw_free.find(" cargo_location ='" + arg_cargo_location + "' and tran_date ='" + arg_tran_date + "'" + 
+                                " and seq > '" + mid(string(ll_compare_seq+10000),2,4) + "'", ll_find_start, dw_free.rowcount())
+    // 自 dw_free 中，從第 ll_find_start 筆向後找尋 cargo_location = arg_cargo_location and tran_date = arg_tran_date and seq = substr(string(ll_compare_seq+10000),2,4)
+    // 回傳找到之資料筆數位置
+    
+    if isnull(ll_find_rows) then ll_find_rows = 0
+    
+    ll_compare_seq ++
+    
+    if ll_find_rows = 0 then
+        exit
+    end if
+    
+    ll_find_start = ll_find_rows + 1
+loop
+
+return ll_compare_seq
+end function
