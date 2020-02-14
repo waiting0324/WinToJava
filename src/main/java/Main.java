@@ -57,9 +57,13 @@ public class Main {
             else if (StrUtil.startWithAny(trimLine, "Str", "json")) {
                 line = doFuncDecl(line);
             }
-
+            // 返回
             else if (trimLine.startsWith("return")) {
                 line = doReturn(line, false);
+            }
+            // 關鍵字
+            else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue")) {
+                line = doKeyword(line);
             }
 
             // 加上換行
@@ -72,6 +76,30 @@ public class Main {
        /* BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
         writer.write(result.toString());
         writer.close();*/
+    }
+
+    // 關鍵字
+    static String doKeyword(String line) {
+
+        String trimLine = line.trim();
+
+        if (trimLine.startsWith("next")) {
+            return line.replace("next", "}");
+        } else if (trimLine.startsWith("end if")) {
+            return line.replace("end if", "}");
+        } else if (trimLine.startsWith("loop")) {
+            return line.replace("loop", "}");
+        } else if (trimLine.startsWith("commit")) {
+            return "";
+        } else if (trimLine.startsWith("open")) {
+            return "// " + line;
+        } else if (trimLine.startsWith("close")) {
+            return "// " + line;
+        } else if (trimLine.startsWith("continue")) {
+            return line + ";";
+        }
+
+        return "";
     }
 
     static String doReturn(String line, boolean isIf) {
