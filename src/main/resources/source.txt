@@ -1,3 +1,7 @@
+json.result 中加入 messagebox('訊息','客服組已輸入【客戶:】使用額度沖銷資料，系統不再自動寫入')
+                               continue
+json.result 中加入 messagebox('錯誤','記帳客戶【'+ls_register_no+'】寫入客戶沖銷使用額度檔失敗 '+ls_err_text)
+
 // Str f_micb_chk_sum_generator (string arg_bank_id, string arg_user_id, long arg_amt)
 // 兆豐銀行客戶虛擬帳號檢核碼產生器
 // string  ls_valid_account, ls_id, ls_amt
@@ -55,3 +59,9 @@ if len(trim(arg_bank_id)) = 0 then return 'Fail'
 return string(li_value4)
 return 0
 return json
+
+
+
+
+
+

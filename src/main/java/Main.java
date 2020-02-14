@@ -37,6 +37,11 @@ public class Main {
                 line = doVariDecl(line);
             }
 
+            // 訊息框
+            else if (StrUtil.containsIgnoreCase(trimLine, "messagebox")) {
+                line = doMessagebox(line, reader);
+            }
+
             // 參數賦值
             else if (StrUtil.startWithAny(line, "ls_", "li_", "ll_")) {
                 line = doAsignParam(line);
@@ -66,16 +71,60 @@ public class Main {
                 line = doKeyword(line);
             }
 
+
+
             // 加上換行
             result.append(line + "\n");
         }
 
 
         System.out.println("===============================");
-        System.out.println(result);
+//        System.out.println(result);
        /* BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
         writer.write(result.toString());
         writer.close();*/
+    }
+
+    static String doMessagebox(String line, BufferedReader reader) throws IOException {
+
+        // 訊息狀態，訊息或錯誤
+        String resultType = "false";
+
+        // 訊息中的變量
+        List<String> params = new ArrayList<>();
+        StringBuilder result = new StringBuilder();
+
+        // 取得訊息行
+        while (!line.contains(")")) {
+            line += reader.readLine();
+        }
+
+
+        line = line.replace("\'", "");
+
+        // '訊息','客服組已輸入【客戶:'+ls_register_no+'】使用額度沖銷資料，系統不再自動寫入'
+        String paramStr = StrUtil.subBetween(line, " messagebox(", ")");
+        // 判斷訊息狀態
+        if (paramStr.split(",")[0].contains("訊息")) resultType = "true";
+
+        // 取得訊息中的變量
+        String msg = paramStr.split(",")[1];
+        String[] split = msg.split("\\+");
+        for (String s : split) {
+            if (s.contains("_")) params.add(s);
+        }
+
+        // 拼裝結果
+        result.append("// TODO " + msg + "\n");
+        if (params.size() > 0) {
+            // Object[] args = new Object[] {keep_gci_date, keep_pcs};
+            result.append("Object[] args = new Object[] {" + StrUtil.unWrap(params.toString(), "[", "]") + "};\n");
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0000, null, args);\n");
+        } else {
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0000, null, null);\n");
+        }
+
+        return result.toString();
     }
 
     // 關鍵字
