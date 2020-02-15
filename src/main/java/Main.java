@@ -372,7 +372,7 @@ public class Main {
         StringBuilder oriSql = new StringBuilder();
 
         // 首句尾巴加上 " +
-        oriSql.append(line + " \" \u002B \n");
+        oriSql.append(line.trim() + " \" \u002B \n");
 
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.replace("\"", "\'");
@@ -498,11 +498,24 @@ public class Main {
             // 此種SQL類型 select custom_id into :ls_custom_id
             if (isIntoTypeSql) {
                 if (line.contains(":")) {
-                    String selectColumn = StrUtil.subBetween(line, ":", " ");
-                    if (selectColumn.contains(",")) {
-                        selectColumn = selectColumn.replace(",", "");
+                    // 存入參數寫在一行  into :ll_b_vol1, :ll_b_vol2, :ll_b_vol3
+                    if (StrUtil.count((CharSequence) line, ":") > 1) {
+                        // 去除雜訊
+                        line = line.replaceAll("\"", "").replaceAll("\\+", "");
+                        // 取出參數
+                        List<String> split = StrUtil.splitTrim(line, ",");
+                        for (String s : split) {
+                            selecColumns.add(StrUtil.subAfter(s, ":", false));
+                        }
                     }
-                    selecColumns.add(selectColumn);
+                    // 存入參數存在不同行
+                    else {
+                        String selectColumn = StrUtil.subBetween(line, ":", " ");
+                        if (selectColumn.contains(",")) {
+                            selectColumn = selectColumn.replace(",", "");
+                        }
+                        selecColumns.add(selectColumn);
+                    }
                 }
             }
             // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
