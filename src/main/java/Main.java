@@ -194,9 +194,9 @@ public class Main {
         if (params.size() > 0) {
             // Object[] args = new Object[] {keep_gci_date, keep_pcs};
             result.append("Object[] args = new Object[] {" + StrUtil.unWrap(params.toString(), "[", "]") + "};\n");
-            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0000, null, args);\n");
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, args);\n");
         } else {
-            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0000, null, null);\n");
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, null);\n");
         }
 
         return result.toString();
@@ -426,7 +426,7 @@ public class Main {
                 isFromAppear = true;
             }
 
-            if (isIntoAppear && sqlLine.contains(":")) {
+            if (isIntoAppear && sqlLine.contains(":") && !isFromAppear) {
                 continue;
             }
 
@@ -537,13 +537,24 @@ public class Main {
         // 參數集合
         Set<String> params = new LinkedHashSet();
 
+        boolean isFromAppear = false;
+
         // 行SQL的列表
         List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
+
+        // 是否是查詢類型
+        boolean isInsertSql = StrUtil.containsIgnoreCase(sqlLines.get(0), "insert");
 
         // substr(:ls_virtual_account,1,4)
         // = :ls_virtual_account
 
         for (String line : sqlLines) {
+
+            if (!isInsertSql) {
+                if (StrUtil.containsIgnoreCase(line, "from")) {isFromAppear = true;}
+                if (!isFromAppear) continue;
+            }
+
             String param = StrUtil.subBetween(line, ":", ",");
             if (param == null) param = StrUtil.subBetween(line, ":", "|");
             if (param == null) param = StrUtil.subBetween(line, ":", "\n");
@@ -678,15 +689,14 @@ public class Main {
             line = StrUtil.format("if ({} == {}) { {} }", condiLeft, number, func);
         }
 
-//        System.out.println(line);
         if (condi.startsWith("ls_")) {
             // ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B')
             List<String> split = StrUtil.splitTrim(condi, "=");
             condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
             if (!"".equals(comment)) {
-                line = StrUtil.format("if ({}) { {}; } // {}", condi, func, comment);
+                line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
             } else {
-                line = StrUtil.format("if ({}) { {}; }", condi, func);
+                line = StrUtil.format("if ({}) { {} ", condi, func);
             }
         }
         // ll_pay_amt = 0
@@ -698,12 +708,12 @@ public class Main {
             } else if (">".equals(operator)) {
                 split = StrUtil.splitTrim(condi, ">");
             } else if ("<".equals(operator)) {
-                split = StrUtil.splitTrim(condi, "<>>");
+                split = StrUtil.splitTrim(condi, "<");
             } else {
-                return line = StrUtil.format("if ({}) { {}; }", condi, func);
+                return line = StrUtil.format("if ({}) { {} ", condi, func);
             }
-            condi = StrUtil.format("{}.intValue() == {}", split.get(0), split.get(1));
-            line = StrUtil.format("if ({}) { {}; }", condi, func);
+            condi = StrUtil.format("{}.intValue() {} {}", split.get(0), operator, split.get(1));
+            line = StrUtil.format("if ({}) { {} ", condi, func);
         }
 
        /* else if ("not".equals(firstStr)) {

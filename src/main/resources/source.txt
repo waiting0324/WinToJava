@@ -1,2 +1,8 @@
-if ls_cust_attr    = 'A' then ls_ar_type = '003'  // 航空公司
-if ls_cust_attr    = 'A' then ls_ar_type = '003'
+
+                               select credit_vol, used_vol  , temp_vol
+                                 into :ll_b_vol1, :ll_b_vol2, :ll_b_vol3
+                                 from registered_customer
+                                where cargo_location =:ls_cargo_location
+                                  and register_no    =:ls_used_cust_id
+                               for update of used_vol
+                                  ;
