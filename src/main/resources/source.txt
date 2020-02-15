@@ -1,8 +1,5 @@
-
-                               select credit_vol, used_vol  , temp_vol
-                                 into :ll_b_vol1, :ll_b_vol2, :ll_b_vol3
-                                 from registered_customer
+update registered_customer
+                                  set used_vol       =:ll_b_vol2 - :ll_milus_amt
                                 where cargo_location =:ls_cargo_location
                                   and register_no    =:ls_used_cust_id
-                               for update of used_vol
-                                  ;
+                                     ;

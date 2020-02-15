@@ -556,14 +556,14 @@ public class Main {
         List<String> sqlLines = StrUtil.splitTrim(oriSql, "\n");
 
         // 是否是查詢類型
-        boolean isInsertSql = StrUtil.containsIgnoreCase(sqlLines.get(0), "insert");
+        boolean isSelectSql = StrUtil.containsIgnoreCase(sqlLines.get(0), "select");
 
         // substr(:ls_virtual_account,1,4)
         // = :ls_virtual_account
 
         for (String line : sqlLines) {
 
-            if (!isInsertSql) {
+            if (isSelectSql) {
                 if (StrUtil.containsIgnoreCase(line, "from")) {isFromAppear = true;}
                 if (!isFromAppear) continue;
             }
