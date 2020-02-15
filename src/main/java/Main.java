@@ -21,7 +21,6 @@ public class Main {
         InputStream is = new FileInputStream(Main.class.getClassLoader().getResource("source.txt").getPath());
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 
-
         while (true) {
             String line = reader.readLine();
             String trimLine = StrUtil.trimToEmpty(line);
@@ -33,7 +32,7 @@ public class Main {
             if (line == null) {
                 break;
             } else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {
-                continue;
+                //continue;
             }
 
             // 聲明List加註釋
@@ -88,6 +87,10 @@ public class Main {
             else if (StrUtil.startWithIgnoreCase(trimLine, "UPDATE")
                 || StrUtil.startWithIgnoreCase(trimLine, "INSERT")) {
                 line = doUpdate(line, reader);
+            }
+            // 處理for跟do while
+            else if (StrUtil.startWithAny(trimLine, "for", "do while")) {
+                line = line + " {";
             }
 
 
@@ -231,7 +234,7 @@ public class Main {
         line = line.trim().split(" ")[1].trim();
 
         // 失敗
-        if ("\'Fail\'".equalsIgnoreCase(line)) {
+        if ("\"Fail\"".equalsIgnoreCase(line)) {
             result.append("\n// 失敗 \n");
             result.append("return new TransactionData(false, \"\", FeeResultEnum.FE00_E0001, null, null);\n");
         }
@@ -275,7 +278,7 @@ public class Main {
             String operator = "";
             String[] params = null;
             if (func.contains("-")) {
-                operator = "sub";
+                operator = "subtract";
                 params = func.split("-");
             } else if (func.contains("+")) {
                 operator = "add";
@@ -591,7 +594,7 @@ public class Main {
         // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespository.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resStrMap = (Map<String, String>) " + table + "Respository.findMapByNativeSql(sql, param);\n";
+        table = "resStrMap = (Map<String, String>) " + table + "Respository.findMapByNativeSql(sql, param).get(0);\n";
         result += table;
 
         // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
@@ -635,7 +638,11 @@ public class Main {
         // 條件判斷式
         String condi = StrUtil.subBetween(line, "if", "then").trim();
         // 執行語句
-        String func = StrUtil.subAfter(afterLine, "then", false);
+        String func = null;
+        if (afterLine.contains("//")) func = StrUtil.subBetween(afterLine, "then","//").trim();
+        if (!afterLine.contains("//")) func = StrUtil.subAfter(afterLine, "then",true).trim();
+        // 註釋
+        String comment = StrUtil.subAfter(afterLine, "//", true);
 
 
         // if isnull(ls_register_no) then ls_register_no  = ''
@@ -676,7 +683,11 @@ public class Main {
             // ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B')
             List<String> split = StrUtil.splitTrim(condi, "=");
             condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
-            line = StrUtil.format("if ({}) { {}; }", condi, func);
+            if (!"".equals(comment)) {
+                line = StrUtil.format("if ({}) { {}; } // {}", condi, func, comment);
+            } else {
+                line = StrUtil.format("if ({}) { {}; }", condi, func);
+            }
         }
         // ll_pay_amt = 0
         else if (StrUtil.startWithAny(condi, "ll_", "li_", "ld_")) {
