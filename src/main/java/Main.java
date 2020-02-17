@@ -93,6 +93,11 @@ public class Main {
                 line = line + " {";
             }
 
+            // Pojo屬性賦值
+            else if (trimLine.startsWith("dw_")) {
+                line = doPojoPropAssign(line);
+            }
+
 
             // 加上換行
             result.append(line + "\n");
@@ -104,6 +109,28 @@ public class Main {
         BufferedWriter writer = FileUtil.getWriter("C:/Users/6550/Desktop/result.txt", "UTF-8", false);
         writer.write(result.toString());
         writer.close();
+    }
+
+    static String doPojoPropAssign(String line) {
+
+        String trimLine = line.trim();
+
+        // 實體類
+        String pojo = StrUtil.subBefore(trimLine, ".", false).trim();
+        // 屬性
+        String prop = StrUtil.subBetween(trimLine, ".", " ").trim();
+        // 值
+        String value = StrUtil.subAfter(trimLine, "=", true).trim().replace("\'", "\"");
+
+        if (StrUtil.isWrap(value, "long(", ")")) {
+            value = StrUtil.format("new BigDecimal({})", StrUtil.unWrap(value, "long(", ")"));
+        }
+
+
+        String setterFun = StrUtil.genSetter(StrUtil.toCamelCase(prop));
+
+        return StrUtil.format("{}.{}({});", pojo, setterFun, value);
+
     }
 
     static String doUpdate(String line, BufferedReader reader) throws IOException {
@@ -131,9 +158,9 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespository.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRepository.findMapByNativeSql(sql, param);
         table = StrUtil.toCamelCase(table);
-        table = table + "Respository.executeUpdate(sql, param);\n";
+        table = table + "Repository.executeUpdate(sql, param);\n";
         result += table;
 
         return result;
@@ -372,7 +399,7 @@ public class Main {
         StringBuilder oriSql = new StringBuilder();
 
         // 首句尾巴加上 " +
-        oriSql.append(line.trim() + " \" \u002B \n");
+        oriSql.append(line.replace("\"", "").trim() + " \" \u002B \n");
 
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
             line = line.replace("\"", "\'");
@@ -614,7 +641,7 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespoitory.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
         table = "resStrMap = (Map<String, String>) " + table + "Repository.findMapByNativeSql(sql, param).get(0);\n";
@@ -707,14 +734,11 @@ public class Main {
 
             condi = doIfLsCondi(condi);
 
-
-
-
             /*List<String> split = StrUtil.splitTrim(condi, "=");
             condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));*/
 
             // 替只有一行的func加上下括號
-            if (!"".equals(func)) func = func + " }";
+            if (!"".equals(func)) func = func + "; }";
 
             if (!"".equals(comment)) {
                 line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
@@ -805,10 +829,20 @@ public class Main {
         // 簡單類型 ls_payment_type = "L"
         else {
             List<String> split = StrUtil.splitTrim(condi, "=");
-            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+            if (split.size() > 1) condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+
+            // 如果不是比較字串內容， 而是比較長度
+            if (StrUtil.startWith(condi.trim(), "len(")) {
+                String operator = StrUtil.splitTrim(condi, " ").get(1);
+                // 處理條件判斷式
+                String condiLeft = StrUtil.subBefore(condi, operator, false).trim();
+                // 條件判斷式左側
+                condiLeft = tranIfLenTrimParas(condiLeft);
+                Integer number = ReUtil.getFirstNumber(condi);
+
+                return StrUtil.format("{} {} {}", condiLeft, operator, number);
+            }
         }
-
-
 
         return condi;
     }

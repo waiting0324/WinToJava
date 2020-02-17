@@ -1,3 +1,5 @@
-//if ls_payment_type = 'W' or ls_payment_type = 'N' then ls_ar_type = '006'
- if ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B') then ls_ar_type = '001'  // 一般 & 快遞客戶
-if ls_payment_type = 'L' then ls_ar_type = '005'
+dw_error.title = '轉檔比對結果視窗'
+dw_error_T_li_insert_row.tran_date      = ls_value1
+            dw_error_T_li_insert_row.amt            = long(ls_value2)
+            dw_error_T_li_insert_row.seqno          = ls_value3
+            dw_error_T_li_insert_row.status         = 'V'
