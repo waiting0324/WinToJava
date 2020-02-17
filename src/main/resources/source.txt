@@ -1,5 +1,9 @@
-dw_error.title = '轉檔比對結果視窗'
-dw_error_T_li_insert_row.tran_date      = ls_value1
-            dw_error_T_li_insert_row.amt            = long(ls_value2)
-            dw_error_T_li_insert_row.seqno          = ls_value3
-            dw_error_T_li_insert_row.status         = 'V'
+ ls_cargo        = dw_error_T_l_i.cargo_location
+        ls_desc         = dw_error_T_l_i.seqno
+        ls_tran_date    = dw_error_T_l_i.tran_date
+        ll_amt          = dw_error_T_l_i.amt
+        ls_start_date   = dw_error_T_l_i.start_date
+        ls_end_date     = dw_error_T_l_i.end_date
+        ls_custom_id    = dw_error_T_l_i.custom_id
+        ls_payment_type = dw_error_T_l_i.payment_type
+        ls_ar_item      = dw_error_T_l_i.ar_item      

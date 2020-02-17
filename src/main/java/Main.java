@@ -323,6 +323,13 @@ public class Main {
         else if (StrUtil.startWithAny(func, "substr", "mid")) {
             func = doSubStr(func);
         }
+        // pojo 取值計算   ls_cargo = dw_error.cargo_location
+        else if (func.contains(".")) {
+            List<String> split = StrUtil.splitTrim(func, ".");
+            String pojo = split.get(0);
+            String prop = split.get(1);
+            func = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+        }
 
 
 
