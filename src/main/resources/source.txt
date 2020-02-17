@@ -1,9 +1,1 @@
- ls_cargo        = dw_error_T_l_i.cargo_location
-        ls_desc         = dw_error_T_l_i.seqno
-        ls_tran_date    = dw_error_T_l_i.tran_date
-        ll_amt          = dw_error_T_l_i.amt
-        ls_start_date   = dw_error_T_l_i.start_date
-        ls_end_date     = dw_error_T_l_i.end_date
-        ls_custom_id    = dw_error_T_l_i.custom_id
-        ls_payment_type = dw_error_T_l_i.payment_type
-        ls_ar_item      = dw_error_T_l_i.ar_item      
+ll_find_start = ll_find_rows + 1

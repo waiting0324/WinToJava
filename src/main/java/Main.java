@@ -121,6 +121,12 @@ public class Main {
         String prop = StrUtil.subBetween(trimLine, ".", " ").trim();
         // 值
         String value = StrUtil.subAfter(trimLine, "=", true).trim().replace("\'", "\"");
+        String comment = "";
+        if (value.contains("//")) {
+            List<String> split = StrUtil.splitTrim(value, "//");
+            value = split.get(0);
+            comment = split.get(1);
+        }
 
         if (StrUtil.isWrap(value, "long(", ")")) {
             value = StrUtil.format("new BigDecimal({})", StrUtil.unWrap(value, "long(", ")"));
@@ -129,7 +135,11 @@ public class Main {
 
         String setterFun = StrUtil.genSetter(StrUtil.toCamelCase(prop));
 
-        return StrUtil.format("{}.{}({});", pojo, setterFun, value);
+        if ("".equals(comment)) {
+            return StrUtil.format("{}.{}({});", pojo, setterFun, value);
+        } else {
+            return StrUtil.format("{}.{}({}); // {}", pojo, setterFun, value, comment);
+        }
 
     }
 
@@ -295,6 +305,10 @@ public class Main {
         // 單純賦值為0  ll_non_rcv_cnt = 0
         if ("0".equals(func)) {
             func = "BigDecimal.ZERO";
+        }
+        // 單純賦值為1  ll_non_rcv_cnt = 1
+        else if ("1".equals(func)) {
+            func = "BigDecimal.ONE";
         }
         // 單純賦值字串  ls_ar_type = '008'
         else if (StrUtil.isWrap(func, "\'")) {
@@ -719,6 +733,7 @@ public class Main {
         else if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
 
             String operator = StrUtil.splitTrim(condi, " ").get(1);
+            if ("=".equals(operator)) operator = "==";
 
             // 處理條件判斷式
             String condiLeft = StrUtil.subBefore(condi, operator, false).trim();
