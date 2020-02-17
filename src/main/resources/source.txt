@@ -1,5 +1,3 @@
-update registered_customer
-                                  set used_vol       =:ll_b_vol2 - :ll_milus_amt
-                                where cargo_location =:ls_cargo_location
-                                  and register_no    =:ls_used_cust_id
-                                     ;
+//if ls_payment_type = 'W' or ls_payment_type = 'N' then ls_ar_type = '006'
+ if ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B') then ls_ar_type = '001'  // 一般 & 快遞客戶
+if ls_payment_type = 'L' then ls_ar_type = '005'

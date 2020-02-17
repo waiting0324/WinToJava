@@ -154,7 +154,7 @@ public class Main {
         else if (line.contains("-=")) {
             String leftParam = line.split("-=")[0].trim();
             String func = line.split("-=")[1].trim();
-            line = StrUtil.indexedFormat("{0} = {0}.sub({1})", leftParam, func);
+            line = StrUtil.indexedFormat("{0} = {0}.subtract({1})", leftParam, func);
         }
 
         return line + ";";
@@ -318,7 +318,7 @@ public class Main {
         /*if (split[1].contains("_")) {
             func = StrUtil.format("{}.subString({}.intValue()-1, {}.intValue() + {}))", split[0], split[1], split[1], Integer.parseInt(split[2])-2);
         } else {*/
-            func = StrUtil.format("{}.substring({}, {}) //TODO 更改位置", split[0], split[1], split[2]);
+            func = StrUtil.format("{}.substring({}, {}); //TODO 更改位置", split[0], split[1], split[2]);
         //}
         return func;
     }
@@ -544,7 +544,7 @@ public class Main {
         return tables;
     }
 
-    // 取得SQL :param 變量
+    // 取得SQL :param 要替換的變量
     static Set<String> getSqlParams(String oriSql) {
 
         // 參數集合
@@ -560,7 +560,6 @@ public class Main {
 
         // substr(:ls_virtual_account,1,4)
         // = :ls_virtual_account
-
         for (String line : sqlLines) {
 
             if (isSelectSql) {
@@ -615,10 +614,10 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespository.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRespoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resStrMap = (Map<String, String>) " + table + "Respository.findMapByNativeSql(sql, param).get(0);\n";
+        table = "resStrMap = (Map<String, String>) " + table + "Repository.findMapByNativeSql(sql, param).get(0);\n";
         result += table;
 
         // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
@@ -685,8 +684,10 @@ public class Main {
         // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
         else if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
 
+            String operator = StrUtil.splitTrim(condi, " ").get(1);
+
             // 處理條件判斷式
-            String condiLeft = StrUtil.subBefore(condi, "=", false).trim();
+            String condiLeft = StrUtil.subBefore(condi, operator, false).trim();
             // 條件判斷式左側
             condiLeft = tranIfLenTrimParas(condiLeft);
 
@@ -699,13 +700,22 @@ public class Main {
             Integer number = ReUtil.getFirstNumber(line);
 
             // 拼接結果
-            line = StrUtil.format("if ({} == {}) { {} }", condiLeft, number, func);
+            line = StrUtil.format("if ({} {} {}) { {} ", condiLeft, operator, number, func);
         }
 
         if (condi.startsWith("ls_")) {
-            // ls_payment_type = 'H' and (ls_cust_attr = 'N' or ls_cust_attr = 'B')
-            List<String> split = StrUtil.splitTrim(condi, "=");
-            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+
+            condi = doIfLsCondi(condi);
+
+
+
+
+            /*List<String> split = StrUtil.splitTrim(condi, "=");
+            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));*/
+
+            // 替只有一行的func加上下括號
+            if (!"".equals(func)) func = func + " }";
+
             if (!"".equals(comment)) {
                 line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
             } else {
@@ -734,6 +744,73 @@ public class Main {
         }
 */
         return line;
+    }
+
+    // 處理 if 字串類型條件
+    static String doIfLsCondi(String condi) {
+
+        // 複雜類型
+        // ls_payment_type = "W" || ls_payment_type = "N"
+        // ls_payment_type = "H" && (ls_cust_attr = "N" || ls_cust_attr = "B")
+        if (StrUtil.containsAny(condi, "||", "&&")) {
+
+            // 條件是否被括號包住
+            boolean isWrapByBrack = false;
+
+            // 先去括號
+            if (StrUtil.isWrap(condi.trim(), "(", ")")) {
+                isWrapByBrack = true;
+                condi = StrUtil.unWrap(condi.trim(), "(", ")");
+            }
+
+            // || 跟 && 運算符位置
+            int orPos = StrUtil.indexOfIgnoreCase(condi, "||");
+            int andPos = StrUtil.indexOfIgnoreCase(condi, "&&");
+
+            // 不存在，則位置設為無限遠
+            if (orPos == -1) orPos = 9999;
+            if (andPos == -1) andPos = 9999;
+
+
+            // 如果 || 運算符在條件靠前位置
+            if (orPos < andPos) {
+                String condi1 = StrUtil.subBefore(condi, "||", false);
+                String condi2 = StrUtil.subAfter(condi, "||", false);
+
+                condi1 = doIfLsCondi(condi1);
+                condi2 = doIfLsCondi(condi2);
+
+                if (isWrapByBrack) {
+                    return StrUtil.format("({} || {})", condi1, condi2);
+                } else {
+                    return condi1 + " || " + condi2;
+                }
+            }
+
+            else if (andPos < orPos) {
+                String condi1 = StrUtil.subBefore(condi, "&&", false);
+                String condi2 = StrUtil.subAfter(condi, "&&", false);
+
+                condi1 = doIfLsCondi(condi1);
+                condi2 = doIfLsCondi(condi2);
+
+                if (isWrapByBrack) {
+                    return StrUtil.format("({} && {})", condi1, condi2);
+                } else {
+                    return condi1 + " && " + condi2;
+                }
+            }
+
+        }
+        // 簡單類型 ls_payment_type = "L"
+        else {
+            List<String> split = StrUtil.splitTrim(condi, "=");
+            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
+        }
+
+
+
+        return condi;
     }
 
     // integer li_i, li_j → igDecimal li_i = BigDecimal.ZERO, li_j = BigDecimal.ZERO;
