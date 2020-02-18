@@ -168,7 +168,7 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRepository.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resMap = (Map<String, String>) custVirtualAccountRepository.findMapByNativeSql(sql, param);
         table = StrUtil.toCamelCase(table);
         table = table + "Repository.executeUpdate(sql, param);\n";
         result += table;
@@ -386,8 +386,7 @@ public class Main {
         // 常用變量聲明
         result += "String sql;\n";
         result += "Map<String, Object> param;\n";
-        result += "Map<String, String> resStrMap;\n";
-        result += "Map<String, BigDecimal> resDecMap;\n";
+        result += "Map<String, Object> resMap;\n";
 
         return result;
     }
@@ -423,7 +422,7 @@ public class Main {
         oriSql.append(line.replace("\"", "").trim() + " \" \u002B \n");
 
         while (!StrUtil.contains(line = reader.readLine(), ";")) {
-            line = line.replace("\"", "\'");
+            line = line.replace("\"", "");
             line = line.trim();
 
             // 空格格式化
@@ -662,26 +661,26 @@ public class Main {
 
         result += "\n";
 
-        // 增加持久層查詢語句  resStrMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resStrMap = (Map<String, String>) " + table + "Repository.findMapByNativeSql(sql, param).get(0);\n";
+        table = "resMap = (Map<String, Object>) " + table + "Repository.findMapByNativeSql(sql, param).get(0);\n";
         result += table;
 
-        // 查詢結果封裝 ls_temp = resStrMap.get("LS_TEMP");
+        // 查詢結果封裝 ls_temp = resMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
             selecColumn = selecColumn.trim();
             if (isIntoTypeSql) {
                 // 數字類型
                 if (StrUtil.containsAnyIgnoreCase(selecColumn, "ll", "li", "ld")) {
-                    result = result + selecColumn.toLowerCase() + " = new BigDecimal(resStrMap.get(\"" + selecColumn.toUpperCase() + "\"));\n";
+                    result = result + selecColumn.toLowerCase() + " = (BigDecimal) resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
                 }
                 // 非數字類型
                 else {
-                    result = result + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                    result = result + selecColumn.toLowerCase() + " = (String) resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
                 }
             } else {
-                result = result + "ls_" + selecColumn.toLowerCase() + " = resStrMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                result = result + "ls_" + selecColumn.toLowerCase() + " = resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
             }
         }
 
