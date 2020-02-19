@@ -386,7 +386,8 @@ public class Main {
         // 常用變量聲明
         result += "String sql;\n";
         result += "Map<String, Object> param;\n";
-        result += "Map<String, Object> resMap;\n";
+        result += "Map<String, Object> resultMap;\n";
+        result += "List<Object> resultList;\n";
 
         return result;
     }
@@ -641,6 +642,12 @@ public class Main {
         Set<String> params = getSqlParams(oriSql);
 
 
+        // 產生JPA查詢表的API
+        if (selecColumns.size() > 5 && tables.length == 1) {
+//            doJPAApi(oriSql)
+        }
+
+
         // 增加查詢欄位別名
         oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
 
@@ -664,7 +671,9 @@ public class Main {
         // 增加持久層查詢語句  resMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resMap = (Map<String, Object>) " + table + "Repository.findMapByNativeSql(sql, param).get(0);\n";
+        table = "resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n";
+        table += "resultMap = new HashMap();\n";
+        table += "if (resultList.size() != 0)  resultMap = (Map<String, Object>) resultList.get(0);\n";
         result += table;
 
         // 查詢結果封裝 ls_temp = resMap.get("LS_TEMP");

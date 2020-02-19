@@ -1,52 +1,25 @@
-insert into "AR_TRADE"
-                      ("AUTO",
-                       "CARGO_LOCATION",
-                       "TRAN_DATE",
-                       "SEQ",
-                       "START_DATE",
-                       "END_DATE",
-                       "CUSTOM_ID",
-                       "DB_FLAG",
-                       "TOT_AMOUNT",
-                       "AR_MILUS_AMT",
-                       "DET_OVER",
-                       "AR_OVER_AMT",
-                       "REMITTANCE_FEE",
-                       "BANK_ID",
-                       "BANK_ACCT_NO",
-                       "AR_DESC",
-                       "TR_RCV_FLAG",
-                       "CLOSE_FLAG",
-                       "AR_ACCT_NO",
-                       "TR_RCV_IN_ACCT_NO",
-                       "AR_TYPE",
-                       "AUTO_WRITE",
-                       "VIRTUAL_ACCOUNT",
-                       "UPD_USER",
-                       "UPD_DATE" )
-                values('Y',
-                       :ls_cargo_location,
-                       to_char(sysdate,'yyyymmdd'),
-                       :ls_seq,
-                       :ls_start_date,
-                       :ls_end_date,
-                       :ls_register_no,
-                       'N',
-                       :ll_pay_amt,
-                       0,
-                       0,
-                       :ll_pay_amt,
-                       0,
-                       '138',
-                       trim(:ls_bank_acct_no),
-                       '無對應客戶帳款可沖銷，先入暫收款',
-                       'Y',
-                       'N',
-                       :ls_acct_no,
-                       '2120000',
-                       :ls_ar_type,
-                       :ls_auto_write,
-                       :ls_virtual_account,
-                       'SYSTEM',
-                       sysdate
-                      ) ;
+json REGISTERED_CUSTOMER(str arg_cargo_location)
+    SELECT CUSTOM_ID,
+           CUSTOM_NAME
+      FROM(
+           SELECT REGISTER_NO  CUSTOM_ID,
+                  CUSTOM_NAME  CUSTOM_NAME
+             FROM REGISTERED_CUSTOMER
+            WHERE CARGO_LOCATION = arg_cargo_location
+              AND CUSTOM_NAME IS NOT NULL
+           UNION
+           SELECT AGENT_CODE CUSTOM_ID,
+  	        AGENT_NAME CUSTOM_NAME
+             FROM AGENT
+           UNION
+           SELECT CUSTOM_ID,
+  	        AR_CUST_NAME CUSTOM_NAME
+             FROM AR_RECEIVE
+            WHERE CARGO_LOCATION = :arg_cargo_location
+              AND AR_CUST_NAME IS NOT NULL
+          )
+    GROUP BY CUSTOM_ID,
+             CUSTOM_NAME
+			 ;
+
+    return json
