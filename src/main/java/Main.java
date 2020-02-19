@@ -121,6 +121,7 @@ public class Main {
         String prop = StrUtil.subBetween(trimLine, ".", " ").trim();
         // 值
         String value = StrUtil.subAfter(trimLine, "=", true).trim().replace("\'", "\"");
+        // 處理注釋
         String comment = "";
         if (value.contains("//")) {
             List<String> split = StrUtil.splitTrim(value, "//");
@@ -128,8 +129,21 @@ public class Main {
             comment = split.get(1);
         }
 
+
+        // 處理值
+        if (value.contains(".")) {
+            String valPojo = value.split("\\.")[0];
+            String valProp = value.split("\\.")[1];
+            value = StrUtil.format("{}.{}()", valPojo, StrUtil.genGetter(StrUtil.toCamelCase(valProp)));
+        }
+
+        // 不可用else if
         if (StrUtil.isWrap(value, "long(", ")")) {
             value = StrUtil.format("new BigDecimal({})", StrUtil.unWrap(value, "long(", ")"));
+        }
+
+        if ("0".equals(value)) {
+            value = "BigDecimal.ZERO";
         }
 
 
@@ -212,15 +226,21 @@ public class Main {
         }
 
 
-        line = line.replace("\'", "");
+        line = line.replace("\'", "").trim();
 
         // '訊息','客服組已輸入【客戶:'+ls_register_no+'】使用額度沖銷資料，系統不再自動寫入'
-        String paramStr = StrUtil.subBetween(line, " messagebox(", ")");
+        String paramStr = StrUtil.unWrap(line, "messagebox(", ")");
         // 判斷訊息狀態
         if (paramStr.split(",")[0].contains("訊息")) resultType = "true";
 
         // 取得訊息中的變量
-        String msg = paramStr.split(",")[1];
+        String msg = "";
+        if (paramStr.contains("\',\'")) {
+            // 此種類型 '訊息','客服...'
+            msg = paramStr.split(",")[1];
+        } else {
+            msg = paramStr;
+        }
         String[] split = msg.split("\\+");
         for (String s : split) {
             if (s.contains("_")) params.add(s);
@@ -339,11 +359,24 @@ public class Main {
         }
         // pojo 取值計算   ls_cargo = dw_error.cargo_location
         else if (func.contains(".")) {
-            List<String> split = StrUtil.splitTrim(func, ".");
+            String param = "";
+            boolean isTrim = false;
+            // 有修剪字串 trim(dw_criteria_1.custom_flag)
+            if (StrUtil.isWrap(func, "trim(", ")")) {
+                param = StrUtil.unWrap(func, "trim(", ")");
+                isTrim = true;
+            } else {
+                param = func;
+            }
+            List<String> split = StrUtil.splitTrim(param, ".");
             String pojo = split.get(0);
             String prop = split.get(1);
             func = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+
+
+            if (isTrim)  func = StrUtil.format("StringUtils.trimToEmpty({})", func);
         }
+
 
 
 
@@ -673,23 +706,23 @@ public class Main {
         table = StrUtil.toCamelCase(table);
         table = "resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n";
         table += "resultMap = new HashMap();\n";
-        table += "if (resultList.size() != 0)  resultMap = (Map<String, Object>) resultList.get(0);\n";
+        table += "if (resultList.size() != 0)  resultMap = resultList.get(0);\n";
         result += table;
 
-        // 查詢結果封裝 ls_temp = resMap.get("LS_TEMP");
+        // 查詢結果封裝 ls_temp = resultMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
             selecColumn = selecColumn.trim();
             if (isIntoTypeSql) {
                 // 數字類型
                 if (StrUtil.containsAnyIgnoreCase(selecColumn, "ll", "li", "ld")) {
-                    result = result + selecColumn.toLowerCase() + " = (BigDecimal) resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                    result = result + selecColumn.toLowerCase() + " = (BigDecimal) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
                 }
                 // 非數字類型
                 else {
-                    result = result + selecColumn.toLowerCase() + " = (String) resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                    result = result + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
                 }
             } else {
-                result = result + "ls_" + selecColumn.toLowerCase() + " = resMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                result = result + "ls_" + selecColumn.toLowerCase() + " = resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
             }
         }
 
@@ -702,7 +735,6 @@ public class Main {
         // 替換關鍵字
         line = line.replace("and", "&&").replace("or", "||")
                 .replace("\'", "\"").replace("<>", "!=");
-
 
         if (!line.contains("then")) {
             while (!(line += reader.readLine()).contains("then")) ;
@@ -724,17 +756,34 @@ public class Main {
         String comment = StrUtil.subAfter(afterLine, "//", true);
 
 
-        // if isnull(ls_register_no) then ls_register_no  = ''
-        if (condi.startsWith("isnull")) {
+        // 條件為isnull  if isnull(ls_register_no) 、 if dw_criteria.tran_date_s is null
+        if (condi.startsWith("isnull") || StrUtil.endWith(condi.trim(), "is null")) {
+            String param = "";
 
-            // ls_register_no
-            String param = StrUtil.unWrap(condi, "isnull(", ")");
+            // isnull()格式
+            if (StrUtil.isWrap(condi, "isnull(", ")")) {
+                // ls_register_no
+                param = StrUtil.unWrap(condi, "isnull(", ")");
+            }
+            // is null 格式
+            else {
+                // dw_criteria.tran_date_s
+                param = StrUtil.subBefore(condi, "is", false).trim();
+            }
+
+            // 處理參數 dw_criteria.tran_date_s
+            if (param.contains(".")) {
+                String pojo = param.split("\\.")[0];
+                String prop = param.split("\\.")[1];
+                param = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+            }
+
 
             // 關鍵字轉換
-            func = func.replace("\'", "\"").replace("0", "BigDecimal.ZERO");
-
+            // func = func.replace("\'", "\"").replace("0", "BigDecimal.ZERO");
             // 轉換結果
-            line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
+            //line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
+            condi = param + " == null";
         }
         // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
         // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
@@ -752,51 +801,63 @@ public class Main {
             if (func.trim().startsWith("return")) {
                 func = doReturn(func, true);
             }
-//            func = func.replace("\'", "\"");
 
             Integer number = ReUtil.getFirstNumber(line);
 
             // 拼接結果
-            line = StrUtil.format("if ({} {} {}) { {} ", condiLeft, operator, number, func);
+            condi = StrUtil.format("{} {} {} ", condiLeft, operator, number);
         }
 
-        if (condi.startsWith("ls_")) {
-
+        else if (condi.startsWith("ls_")) {
+            // 處理 if 字串類型條件
             condi = doIfLsCondi(condi);
-
-            /*List<String> split = StrUtil.splitTrim(condi, "=");
-            condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));*/
-
-            // 替只有一行的func加上下括號
-            if (!"".equals(func)) func = func + "; }";
-
-            if (!"".equals(comment)) {
-                line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
-            } else {
-                line = StrUtil.format("if ({}) { {} ", condi, func);
-            }
         }
-        // ll_pay_amt = 0
+        // 條件 ll_pay_amt = 0
         else if (StrUtil.startWithAny(condi, "ll_", "li_", "ld_")) {
             String operator = StrUtil.subBetween(condi.trim(), " ", " ");
             List<String> split = null;
-            if ("=".equals(operator)) {
+            if ("==".equals(operator)) {
+                split = StrUtil.splitTrim(condi, "=");
+            } else if ("=".equals(operator)) {
+                operator = "==";
                 split = StrUtil.splitTrim(condi, "=");
             } else if (">".equals(operator)) {
                 split = StrUtil.splitTrim(condi, ">");
             } else if ("<".equals(operator)) {
                 split = StrUtil.splitTrim(condi, "<");
-            } else {
-                return line = StrUtil.format("if ({}) { {} ", condi, func);
+            } else if ("!=".equals(operator)) {
+                split = StrUtil.splitTrim(condi, "!=");
+            } else if ("<=".equals(operator)) {
+                split = StrUtil.splitTrim(condi, "<=");
+            } else if (">=".equals(operator)) {
+                split = StrUtil.splitTrim(condi, ">=");
             }
             condi = StrUtil.format("{}.intValue() {} {}", split.get(0), operator, split.get(1));
-            line = StrUtil.format("if ({}) { {} ", condi, func);
         }
 
-       /* else if ("not".equals(firstStr)) {
-            isFalse = true;
+        // 處理func
+        if (func.contains(".")) {
+            String pojo = func.split("\\.")[0];
+            String prop = func.split("\\.")[1].split(" ")[0];
+            String value = StrUtil.trimToEmpty(func.split("=")[1]);
+            func = StrUtil.format("{}.{}({})", pojo, StrUtil.genSetter(StrUtil.toCamelCase(prop)), value);
         }
-*/
+        // 不是空則為簡單參數賦值
+        else if (!"".equals(func)) {
+            func = doAsignParam(func);
+            // 去除；
+            func = func.substring(0, func.length()-1);
+        }
+
+
+        // 替只有一行的func加上下括號
+        if (!"".equals(func)) func = func + "; }";
+
+        if (!"".equals(comment)) {
+            line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
+        } else {
+            line = StrUtil.format("if ({}) { {} ", condi, func);
+        }
         return line;
     }
 
@@ -914,6 +975,14 @@ public class Main {
             String param = StrUtil.unWrap(source, "len(", ")");
             if (StrUtil.isWrap(param, "trim(", ")")) {
                 param = StrUtil.unWrap(param, "trim(", ")");
+
+                // 處理pojo屬性獲取情況 user.age
+                if (param.contains(".")) {
+                    String pojo = param.split("\\.")[0];
+                    String prop = param.split("\\.")[1];
+                    param = StrUtil.format("{}.{}()", pojo, StrUtil.genGetter(StrUtil.toCamelCase(prop)));
+                }
+
                 param = StrUtil.wrap(param, "StringUtils.trimToEmpty(", ")");
             }
             // param: StringUtils.trimToEmpty(arg_bank_id).length()
