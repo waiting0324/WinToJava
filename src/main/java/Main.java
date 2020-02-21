@@ -34,14 +34,17 @@ public class Main {
             } else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {
                 //continue;
             }
-
+            // 如果只是標示呼叫API 則變成注釋
+            else if (StrUtil.containsIgnoreCase(line, "call API")) {
+                line =  "// " + line;
+            }
             // 聲明List加註釋
             else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {
                 line = "// " + line;
             }
 
             // 變量聲明
-            else if (StrUtil.startWithAny(trimLine, "string", "integer", "long", "datetime")) {
+            else if (StrUtil.startWithAny(trimLine, "string", "integer","int", "long", "datetime")) {
                 line = doVariDecl(line);
             }
 
@@ -85,7 +88,8 @@ public class Main {
             }
             // 新增或更新SQL
             else if (StrUtil.startWithIgnoreCase(trimLine, "UPDATE")
-                || StrUtil.startWithIgnoreCase(trimLine, "INSERT")) {
+                || StrUtil.startWithIgnoreCase(trimLine, "INSERT")
+                || StrUtil.startWithIgnoreCase(trimLine, "DELETE")) {
                 line = doUpdate(line, reader);
             }
             // 處理for跟do while
@@ -163,6 +167,7 @@ public class Main {
         Set<String> params = getSqlParams(oriSql);
         String table = StrUtil.subBetween(oriSql.toUpperCase(), "UPDATE", "\"");
         if (table == null) table = StrUtil.subBetween(oriSql.toUpperCase(), "INSERT INTO", "\n");
+        if (table == null) table = StrUtil.subBetween(oriSql.toUpperCase(), "DELETE FROM", "\n");
 
         table = table.replace("\"", "").replace("+", "").trim();
 
@@ -302,6 +307,8 @@ public class Main {
         }
         // 是數字
         else if (NumberUtil.isNumber(line)) {
+            // 返回1則不處理
+            if (line.equals("1")) return "";
             result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);\n");
         }
         // 返回JSON則標注待處理
@@ -407,6 +414,7 @@ public class Main {
     // 函數聲明
     static String doFuncDecl(String line) {
 
+
         // 駝峰函數名
         String funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, " ", "(").trim());
         // 參數字串
@@ -432,6 +440,8 @@ public class Main {
             line = doString(line);
         } else if (line.trim().startsWith("integer")) {
             line = doNum(line, "integer");
+        } else if (line.trim().startsWith("int")) {
+            line = doNum(line, "int");
         } else if (line.trim().startsWith("long")) {
             line = doNum(line, "long");
         } else if (line.trim().startsWith("datetime")) {

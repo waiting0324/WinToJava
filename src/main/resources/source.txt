@@ -1,7 +1,1 @@
- if ll_ar_amt < ll_ar_milus_amt then  // ***** itemchange <> itemerror
-             ll_tot_amt  = dw_free.tot_amount
-             
-             if ll_ar_amt < ll_tot_amt then
-                 messagebox('第'+string(row)+'筆錯誤~','指定帳款日期的應收帳款餘額小於入帳金額')
-             end if
-         end if
+messagebox("訊息","取消過帳失敗")
