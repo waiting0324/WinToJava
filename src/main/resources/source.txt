@@ -1,9 +1,5 @@
-if len(trim(dw_criteria.virtual_account)) > 0 then
-
-if len(trim(ls_register_no)) <= 0 and ls_custom_flag = 'Y' then
-
-if len(trim(ls_close_flag)) > 0 and ls_close_flag <> 'A' then
-
-if isnull(ls_start_date) or isnull(ls_end_date) or isnull(ls_payment_type) or isnull(ls_cust_attr)  or isnull(ls_ar_item) then
-
-if ll_ar_amt >= 0 then
+if json.result = 0 then
+    messagebox('訊息','查無資料 !!')
+else
+    將 json 中之值代入 dw_list 中
+end if

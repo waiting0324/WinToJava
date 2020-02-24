@@ -3,6 +3,7 @@ import cn.hutool.core.util.StrUtil;
 import com.waiting.*;
 
 import java.io.*;
+import java.util.regex.Pattern;
 
 /**
  * @author Waiting on 2020/2/10
@@ -30,13 +31,12 @@ public class Main {
             } else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {
                 //continue;
             }
-            // 如果只是標示呼叫API 則變成注釋
-            else if (StrUtil.containsIgnoreCase(line, "call API")) {
+            // 如果是  標示呼叫API、聲明List、json開頭、開頭中文  則變成注釋
+            else if (StrUtil.containsIgnoreCase(line, "call API")
+                || StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
+                || StrUtil.startWithIgnoreCase(trimLine, "json")
+                || Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find()) {
                 line =  "// " + line;
-            }
-            // 聲明List加註釋
-            else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {
-                line = "// " + line;
             }
 
             // 變量聲明
@@ -67,11 +67,10 @@ public class Main {
             // 查詢語句
             else if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
                 line = SqlMod.doSelect(line, reader);
-                isSql = true;
             }
 
             // 函數聲明
-            else if (StrUtil.startWithAny(trimLine, "Str", "json")) {
+            else if (StrUtil.startWithAny(trimLine, "Str")) {
                 line = DeclareMod.doFuncDecl(line);
             }
             // 返回

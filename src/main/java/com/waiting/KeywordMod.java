@@ -55,9 +55,9 @@ public class KeywordMod {
         if (params.size() > 0) {
             // Object[] args = new Object[] {keep_gci_date, keep_pcs};
             result.append("Object[] args = new Object[] {" + StrUtil.unWrap(params.toString(), "[", "]") + "};\n");
-            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, args);\n");
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, args);");
         } else {
-            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, null);\n");
+            result.append("return new TransactionData(" + resultType + ", \"\", FeeResultEnum.FE00_E0001, null, null);");
         }
 
         return result.toString();
