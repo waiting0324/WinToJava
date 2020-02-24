@@ -145,6 +145,12 @@ public class IfMod {
                 // 拼裝結果
                 while (params.size() != 0) {
 
+                    // 如果只有一個參數，則改為int類型直接返回
+                    if (isFirstTime && params.size() == 1) {
+                        condiLeft = params.pop() + condiLeft + ".intValue()";
+                        break;
+                    }
+
                     // 取出該List當前的第一個參數
                     condiLeft = condiLeft + params.pop();
 

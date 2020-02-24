@@ -6,4 +6,4 @@ if len(trim(ls_close_flag)) > 0 and ls_close_flag <> 'A' then
 
 if isnull(ls_start_date) or isnull(ls_end_date) or isnull(ls_payment_type) or isnull(ls_cust_attr)  or isnull(ls_ar_item) then
 
-if ll_ar_amt - ll_ar_rec_amt >= ll_ar_milus_amt then
+if ll_ar_amt >= 0 then
