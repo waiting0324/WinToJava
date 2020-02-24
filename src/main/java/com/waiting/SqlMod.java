@@ -62,6 +62,9 @@ public class SqlMod {
     // 增加查詢欄位別名
     public static String addSelectColumnAlias(String oriSql, List<String> selectColumns, boolean isIntoTypeSql) {
 
+        // 拷貝List， 因為等等List中的資料會移除
+        List<String> columnAliazz = new ArrayList<>(selectColumns);
+
         String[] sqlLines = oriSql.split("\n");
         StringBuilder result = new StringBuilder();
         boolean isFromAppear = false;
@@ -84,46 +87,64 @@ public class SqlMod {
 
             // FROM 關鍵字出現之前，替查詢欄位加上別名
             if (!isFromAppear) {
+
+                // 帶有 into 關鍵字的SQL查詢語句
+                if (isIntoTypeSql) {
+
+                    // 查詢欄位列表
+                    List<String> columns;
+                    // 除去干擾字符
+                    sqlLine = sqlLine.replace("\"", "").replace("+", "").trim();
+                    // 轉譯 nvl(AR_REC_AMT,0) 之情況，避免影響查詢欄位切割
+                    sqlLine = sqlLine.replace(",0)", "|0)");
+
+
+                    // 取出查詢欄位
+                    // 查詢的第一行，帶有select關鍵字
+                    if (StrUtil.startWithIgnoreCase(sqlLine.replace("\"", "").trim(), "SELECT")) {
+                        columns = StrUtil.splitTrim(StrUtil.replaceIgnoreCase(sqlLine, "SELECT", "")
+                                .replace("\"", "").replace("+", ""), ",");
+                        sqlLine = "\" select ";
+
+                    } else {
+                        columns = StrUtil.splitTrim(sqlLine.replace("\"", "")
+                                .replace("+", ""), ",");
+                        sqlLine = "\" ";
+                    }
+
+                    // 拼接查詢欄位與別名
+                    for (int j = 0; j < columns.size(); j++) {
+                        sqlLine = sqlLine + columns.get(j) + " " + columnAliazz.remove(0).toUpperCase() + ", ";
+                    }
+
+
+                    // 如果是最後的查詢欄位行，則去尾部逗號 增加 " + 作為結尾
+                    if (StrUtil.startWithIgnoreCase(sqlLines[i+1].replace("\"","")
+                            .replace("+", "").trim(), "INTO")) {
+                        sqlLine = StrUtil.sub(sqlLine, 0, -2) + " \" \u002B ";
+                    }
+                    // 否則則只加  " + 作為結尾
+                    else {
+                        sqlLine = sqlLine + " \" \u002B ";
+                    }
+
+                    // 將前置轉譯恢復
+                    sqlLine = sqlLine.replace("|0)", ",0)");
+                }
                 // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
-                if (!isIntoTypeSql) {
+                else {
                     // 非最後一個查詢欄位
                     if (sqlLine.contains(",")) {
-                        sqlLine = StrUtil.subBefore(sqlLine, ",", true) + " " + selectColumns.get(i).toUpperCase()
+                        sqlLine = StrUtil.subBefore(sqlLine, ",", true) + " " + columnAliazz.get(i).toUpperCase()
                                 + "," + StrUtil.subAfter(sqlLine, ",", true);
                     }
                     // 最後一個查詢欄位
                     else {
-                        sqlLine = StrUtil.subBefore(sqlLine, "\"", true) + selectColumns.get(i).toUpperCase()
+                        sqlLine = StrUtil.subBefore(sqlLine, "\"", true) + columnAliazz.get(i).toUpperCase()
                                 + "  \"" + StrUtil.subAfter(sqlLine, "\"", true);
                     }
-                } else {
-                    // 非最後一個查詢欄位
-                    if (sqlLine.contains(",")) {
-                        // 有SQL內置函數的 decode(custom_id)
-                        if (sqlLine.contains(")")) {
-                            sqlLine = StrUtil.subBefore(sqlLine, ")", true) + ") " + selectColumns.get(i).toUpperCase()
-                                    + ", \" \u002B ";
-                        }
-                        // 沒有SQL內置函數的 "  payment_type  ,  " +
-                        else {
-                            sqlLine = StrUtil.subBefore(sqlLine, ",", true).trim() + " " + selectColumns.get(i).toUpperCase()
-                                    + "," + StrUtil.subAfter(sqlLine, ",", true);
-                        }
-                    }
-                    // 最後一個查詢欄位
-                    else {
-                        // 有SQL內置函數的 decode(custom_id)
-                        if (sqlLine.contains(")")) {
-                            sqlLine = StrUtil.subBefore(sqlLine, ")", true) + ") " + selectColumns.get(i).toUpperCase()
-                                    + " \" \u002B ";
-                        }
-                        // 沒有SQL內置函數的 "  payment_type    " +
-                        else {
-                            sqlLine = StrUtil.subBefore(sqlLine, "\"", true).trim() + " " + selectColumns.get(i).toUpperCase()
-                                    + "  \"" + StrUtil.subAfter(sqlLine, "\"", true);
-                        }
-                    }
                 }
+
             }
             result.append(sqlLine + "\n");
         }
@@ -215,7 +236,9 @@ public class SqlMod {
         for (String line : sqlLines) {
 
             if (isSelectSql) {
-                if (StrUtil.containsIgnoreCase(line, "from")) {isFromAppear = true;}
+                if (StrUtil.containsIgnoreCase(line, "from")) {
+                    isFromAppear = true;
+                }
                 if (!isFromAppear) continue;
             }
 
@@ -256,7 +279,8 @@ public class SqlMod {
         oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
 
         // :參數增加空格
-        String result = oriSql.toString().replace("(:", "( :").replace("=:", "= :");;
+        String result = oriSql.toString().replace("(:", "( :").replace("=:", "= :");
+        ;
 
 
         // 去除尾部 +號 並增加 ；號
