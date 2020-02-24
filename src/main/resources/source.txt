@@ -1,9 +1,11 @@
-select ar_amt      , ar_rec_amt  , remark
-      into :ll_org_amt1, :ll_org_amt2, :ls_remark
-      from ar_receive
-     where cargo_location =:ls_cargo
-       and start_date     =:ls_start_date
-       and end_date       =:ls_end_date
-       and custom_id      =:ls_custom_id
-       and ar_amt        >=:ll_ar_milus_amt
+delete CREDIT_MAINTAIN
+     where CARGO_LOCATION =:ls_cargo
+       and REGISTER_NO    =:ls_used_cust_id
+       and ADJUST_TYPE    ='U'
+       and ADJUST_DATE    =:ls_tran_date
+       and ADJUST_VOL     =:ll_ar_milus_amt + :ll_ar_over_amt
+       and CALCULATE_TYPE ='O'
+       and START_DATE     =:ls_start_date
+       and END_DATE       =:ls_end_date
+       and DET_SEQ        =:ls_seq
           ;

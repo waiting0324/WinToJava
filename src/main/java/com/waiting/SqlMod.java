@@ -235,6 +235,7 @@ public class SqlMod {
         // = :ls_virtual_account
         for (String line : sqlLines) {
 
+            // 當 FROM 關鍵字出現後才開始查詢
             if (isSelectSql) {
                 if (StrUtil.containsIgnoreCase(line, "from")) {
                     isFromAppear = true;
@@ -242,13 +243,21 @@ public class SqlMod {
                 if (!isFromAppear) continue;
             }
 
-            String param = StrUtil.subBetween(line, ":", ",");
-            if (param == null) param = StrUtil.subBetween(line, ":", "|");
-            if (param == null) param = StrUtil.subBetween(line, ":", "\n");
-            if (param == null) param = StrUtil.subBetween(line, ":", " ");
-            if (param != null) {
-                params.add(param.trim());
+            // 取出參數
+            while (true) {
+                String param = StrUtil.subBetween(line, ":", ",");
+                if (param == null) param = StrUtil.subBetween(line, ":", "|");
+                if (param == null) param = StrUtil.subBetween(line, ":", ")");
+                if (param == null) param = StrUtil.subBetween(line, ":", "\n");
+                if (param == null) param = StrUtil.subBetween(line, ":", " ");
+                if (param != null) {
+                    params.add(param.trim());
+                    line = StrUtil.subAfter(line, ":", false);
+                } else {
+                    break;
+                }
             }
+
         }
 
         return params;
@@ -327,11 +336,20 @@ public class SqlMod {
     // 處理非查詢的SQL語句
     public static String doUpdate(String line, BufferedReader reader) throws IOException {
 
+        // 原來的SQL刪除語句，是否缺少FROM關鍵字
+        boolean isDelLackFrom = false;
+
         String oriSql = getOriSql(line, reader);
         Set<String> params = getSqlParams(oriSql);
         String table = StrUtil.subBetween(oriSql.toUpperCase(), "UPDATE", "\"");
         if (table == null) table = StrUtil.subBetween(oriSql.toUpperCase(), "INSERT INTO", "\n");
         if (table == null) table = StrUtil.subBetween(oriSql.toUpperCase(), "DELETE FROM", "\n");
+        if (table == null) {
+            table = StrUtil.subBetween(oriSql.toUpperCase(), "DELETE", "\n");
+            // DELETE語句缺少 FROM 關鍵字
+            if (table != null) isDelLackFrom = true;
+            oriSql = "\" delete from " + StrUtil.subAfter(oriSql, "delete", false);
+        }
 
         table = table.replace("\"", "").replace("+", "").trim();
 
