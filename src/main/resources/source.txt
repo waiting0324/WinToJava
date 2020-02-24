@@ -1,1 +1,10 @@
-messagebox("訊息","取消過帳失敗")
+select count(*)
+          into :li_cnt
+          from ar_trade
+         where cargo_location =:ls_cargo
+           and tran_date      =:ls_tran_date
+           and custom_id      =:ls_custom_id
+           and ar_type        =:ls_ar_type
+           and tot_amount     =:ll_amt
+           and bank_id        =:ls_bank_id
+              ;
