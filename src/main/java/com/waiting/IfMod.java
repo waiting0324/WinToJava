@@ -20,32 +20,32 @@ public class IfMod {
     // 分離出 if條件判斷式中的 邏輯運算符、左條件式、右條件式
     public static Map splitCondiOperator(String condi) {
 
-        String opeartor = null;
+        String logicOpeartor = null;
         String condiLeft;
         String condiRight;
 
         if (condi.contains("==")) {
-            opeartor = "==";
-        } else if (condi.contains(">")) {
-            opeartor = ">";
-        } else if (condi.contains("<")) {
-            opeartor = "<";
+            logicOpeartor = "==";
         } else if (condi.contains("!=")) {
-            opeartor = "!=";
+            logicOpeartor = "!=";
         } else if (condi.contains("<=")) {
-            opeartor = "<=";
+            logicOpeartor = "<=";
         } else if (condi.contains(">=")) {
-            opeartor = ">=";
+            logicOpeartor = ">=";
         } else if (condi.contains("=")) {
             condi = condi.replace("=", "==");
-            opeartor = "==";
+            logicOpeartor = "==";
+        } else if (condi.contains(">")) {
+            logicOpeartor = ">";
+        } else if (condi.contains("<")) {
+            logicOpeartor = "<";
         }
 
-        condiLeft = StrUtil.splitTrim(condi, opeartor).get(0);
-        condiRight = StrUtil.splitTrim(condi, opeartor).get(1);
+        condiLeft = StrUtil.splitTrim(condi, logicOpeartor).get(0);
+        condiRight = StrUtil.splitTrim(condi, logicOpeartor).get(1);
 
         Map<String, String> resultMap = new HashMap<>();
-        resultMap.put("operator", opeartor);
+        resultMap.put("logicOperator", logicOpeartor);
         resultMap.put("condiLeft", condiLeft);
         resultMap.put("condiRight", condiRight);
 
@@ -99,10 +99,12 @@ public class IfMod {
 
             // 轉換結果
             condi = param + " == null";
-        } else {
+        }
+        // 有邏輯運算符情況 == > <
+        else {
 
             Map<String, String> map = splitCondiOperator(condi);
-            String operator = map.get("operator");
+            String logicOperator = map.get("logicOperator");
             String condiLeft = map.get("condiLeft");
             String condiRight = map.get("condiRight");
 
@@ -112,17 +114,58 @@ public class IfMod {
             }
             // 比較字串是否相等 ls_close_flag != "A"
             else if (condiLeft.startsWith("ls_")){
-                if ("=".equals(operator) || "==".equals(operator)) {
+                if ("=".equals(logicOperator) || "==".equals(logicOperator)) {
                     return StrUtil.format("{}.equals({})", condiRight, condiLeft);
                 } else {
                     return StrUtil.format("!{}.equals({})", condiRight, condiLeft);
                 }
             }
+            // 數字運算
+            else if (StrUtil.startWithAny(condiLeft, "ll_", "li_", "ld_")) {
 
+                // 參數
+                LinkedList<String> params = new LinkedList<>();
+                // 運算符
+                LinkedList<String> operaters = new LinkedList<>();
+
+                // 分離出參數跟運算符
+                List<String> splits = StrUtil.splitTrim(condiLeft, " ");
+                for (String split : splits) {
+                    if (StrUtil.containsAny(split.trim(), "+", "-", "*", "/")) {
+                        operaters.add(split.trim());
+                    } else {
+                        params.add(split);
+                    }
+                }
+
+                condiLeft = "";
+                // 是否第一次拼裝
+                boolean isFirstTime = true;
+
+                // 拼裝結果
+                while (params.size() != 0) {
+
+                    // 取出該List當前的第一個參數
+                    condiLeft = condiLeft + params.pop();
+
+                    // 非第一次拼裝則加上下括號
+                    if (!isFirstTime) condiLeft += ")";
+                    isFirstTime = false;
+
+                    if (operaters.size() != 0) {
+                        // 取出該List當前的第一個運算符
+                        String operator = operaters.pop();
+                        if ("+".equals(operator)) {
+                            condiLeft = condiLeft + ".add(";
+                        } else if ("-".equals(operator)) {
+                            condiLeft = condiLeft + ".substarct(";
+                        }
+                    }
+                }
+            }
 
             // 拼接結果
-            condi = StrUtil.format("{} {} {} ", condiLeft, operator, condiRight);
-
+            condi = StrUtil.format("{} {} {} ", condiLeft, logicOperator, condiRight);
         }
 
 
@@ -142,24 +185,18 @@ public class IfMod {
         }
 
         String trimLine = StrUtil.trimToEmpty(line);
-        boolean isFalse = false;
-        // if後的全部字串
-        String afterLine = StrUtil.subAfter(trimLine, "if", false).trim();
-        // if後的第一個關鍵字
-        String firstStr = StrUtil.subBefore(afterLine, " ", false);
+
         // 條件判斷式
         String condi = StrUtil.subBetween(line, "if", "then").trim();
         // 執行語句
         String func = null;
-        if (afterLine.contains("//")) func = StrUtil.subBetween(afterLine, "then","//").trim();
-        if (!afterLine.contains("//")) func = StrUtil.subAfter(afterLine, "then",true).trim();
+        if (trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "then","//").trim();
+        if (!trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "then",true).trim();
         // 註釋
-        String comment = StrUtil.subAfter(afterLine, "//", true);
+        String comment = StrUtil.subAfter(trimLine, "//", true);
 
-
+        // 翻譯條件判斷式
         condi = trasIfCondition(condi);
-
-        System.out.println(condi);
 
 
         // 處理func
@@ -172,7 +209,7 @@ public class IfMod {
         // 不是空則為簡單參數賦值
         else if (!"".equals(func)) {
             func = AssignMod.doAsignParam(func);
-            // 去除；
+            // 去除分號；
             func = func.substring(0, func.length()-1);
         }
 
@@ -188,82 +225,6 @@ public class IfMod {
         return line;
     }
 
-    // 處理 if 字串類型條件
-    static String doIfLsCondi(String condi) {
-
-        // 複雜類型
-        // ls_payment_type = "W" || ls_payment_type = "N"
-        // ls_payment_type = "H" && (ls_cust_attr = "N" || ls_cust_attr = "B")
-        if (StrUtil.containsAny(condi, "||", "&&")) {
-
-            // 條件是否被括號包住
-            boolean isWrapByBrack = false;
-
-            // 先去括號
-            if (StrUtil.isWrap(condi.trim(), "(", ")")) {
-                isWrapByBrack = true;
-                condi = StrUtil.unWrap(condi.trim(), "(", ")");
-            }
-
-            // || 跟 && 運算符位置
-            int orPos = StrUtil.indexOfIgnoreCase(condi, "||");
-            int andPos = StrUtil.indexOfIgnoreCase(condi, "&&");
-
-            // 不存在，則位置設為無限遠
-            if (orPos == -1) orPos = 9999;
-            if (andPos == -1) andPos = 9999;
-
-
-            // 如果 || 運算符在條件靠前位置
-            if (orPos < andPos) {
-                String condi1 = StrUtil.subBefore(condi, "||", false);
-                String condi2 = StrUtil.subAfter(condi, "||", false);
-
-                condi1 = doIfLsCondi(condi1);
-                condi2 = doIfLsCondi(condi2);
-
-                if (isWrapByBrack) {
-                    return StrUtil.format("({} || {})", condi1, condi2);
-                } else {
-                    return condi1 + " || " + condi2;
-                }
-            }
-
-            else if (andPos < orPos) {
-                String condi1 = StrUtil.subBefore(condi, "&&", false);
-                String condi2 = StrUtil.subAfter(condi, "&&", false);
-
-                condi1 = doIfLsCondi(condi1);
-                condi2 = doIfLsCondi(condi2);
-
-                if (isWrapByBrack) {
-                    return StrUtil.format("({} && {})", condi1, condi2);
-                } else {
-                    return condi1 + " && " + condi2;
-                }
-            }
-
-        }
-        // 簡單類型 ls_payment_type = "L"
-        else {
-            List<String> split = StrUtil.splitTrim(condi, "=");
-            if (split.size() > 1) condi = StrUtil.format("{}.equals({})", split.get(1), split.get(0));
-
-            // 如果不是比較字串內容， 而是比較長度
-            if (StrUtil.startWith(condi.trim(), "len(")) {
-                String operator = StrUtil.splitTrim(condi, " ").get(1);
-                // 處理條件判斷式
-                String condiLeft = StrUtil.subBefore(condi, operator, false).trim();
-                // 條件判斷式左側
-                condiLeft = tranIfLenTrimParas(condiLeft);
-                Integer number = ReUtil.getFirstNumber(condi);
-
-                return StrUtil.format("{} {} {}", condiLeft, operator, number);
-            }
-        }
-
-        return condi;
-    }
 
     // 翻譯 if語句字串長度參數
     // len(trim(arg_bank_id)) + len(trim(arg_user_id)) - len(trim(arg_user_id))
@@ -295,7 +256,10 @@ public class IfMod {
             param += ".length()";
             params.add(param);
         } else {
+
             for (String param : splits) {
+
+                // 轉換 len(trim(ls_close_flag)) →  StringUtils.trimToEmpty(ls_close_flag).length() 並存到參數List中
                 if (StrUtil.isWrap(param, "len(", ")")) {
                     param = StrUtil.unWrap(param, "len(", ")");
                     if (StrUtil.isWrap(param, "trim(", ")")) {
@@ -305,8 +269,9 @@ public class IfMod {
                     // param: StringUtils.trimToEmpty(arg_bank_id).length()
                     param += ".length()";
                     params.add(param);
-
-                } else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")) {
+                }
+                // 將運算符存入List中
+                else if (StrUtil.containsAny(param.trim(), "+", "-", "*", "/")) {
                     operaters.add(param.trim());
                 }
             }
@@ -314,10 +279,12 @@ public class IfMod {
         }
 
         String result = "";
-
+        // 拼裝結果
         while (params.size() != 0) {
+            // 取出該List當前的第一個參數
             result += params.pop();
             if (operaters.size() != 0) {
+                // 取出該List當前的第一個運算符
                 result = result + " " + operaters.pop() + " ";
             }
         }
