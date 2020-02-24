@@ -1,11 +1,1 @@
-delete CREDIT_MAINTAIN
-     where CARGO_LOCATION =:ls_cargo
-       and REGISTER_NO    =:ls_used_cust_id
-       and ADJUST_TYPE    ='U'
-       and ADJUST_DATE    =:ls_tran_date
-       and ADJUST_VOL     =:ll_ar_milus_amt + :ll_ar_over_amt
-       and CALCULATE_TYPE ='O'
-       and START_DATE     =:ls_start_date
-       and END_DATE       =:ls_end_date
-       and DET_SEQ        =:ls_seq
-          ;
+if li_credit > 0 and ls_cust_attr <> 'B' and ls_auto_write = 'Y' then

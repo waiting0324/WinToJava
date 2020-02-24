@@ -2,12 +2,13 @@ package com.waiting;
 
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
-import com.sun.tools.javac.Main;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author 6550
@@ -16,7 +17,120 @@ import java.util.List;
  */
 public class IfMod {
 
-    // 處理if條件判斷式
+    // 分離出 if條件判斷式中的 邏輯運算符、左條件式、右條件式
+    public static Map splitCondiOperator(String condi) {
+
+        String opeartor = null;
+        String condiLeft;
+        String condiRight;
+
+        if (condi.contains("==")) {
+            opeartor = "==";
+        } else if (condi.contains(">")) {
+            opeartor = ">";
+        } else if (condi.contains("<")) {
+            opeartor = "<";
+        } else if (condi.contains("!=")) {
+            opeartor = "!=";
+        } else if (condi.contains("<=")) {
+            opeartor = "<=";
+        } else if (condi.contains(">=")) {
+            opeartor = ">=";
+        } else if (condi.contains("=")) {
+            condi = condi.replace("=", "==");
+            opeartor = "==";
+        }
+
+        condiLeft = StrUtil.splitTrim(condi, opeartor).get(0);
+        condiRight = StrUtil.splitTrim(condi, opeartor).get(1);
+
+        Map<String, String> resultMap = new HashMap<>();
+        resultMap.put("operator", opeartor);
+        resultMap.put("condiLeft", condiLeft);
+        resultMap.put("condiRight", condiRight);
+
+        return resultMap;
+    }
+
+    // 翻譯 if 的條件判斷式
+    public static String trasIfCondition(String condi) {
+
+        // ************* 遞迴拆分條件判斷開始 *****************//
+        int andIndex = condi.indexOf("&&");
+        int orIndex = condi.indexOf("||");
+
+        //  &&、||都存在，且&&在||前面   or  只有 &&
+        if ((andIndex != -1 && orIndex != -1 && andIndex < orIndex)
+            || (andIndex > 0 && orIndex == -1)) {
+            return trasIfCondition(StrUtil.subBefore(condi, "&&", false))
+                    + " && " +trasIfCondition(StrUtil.subAfter(condi, "&&", false));
+        }
+        // && 、||都存在，且||在&&前面   or  只有||
+        else if ((andIndex != -1 && orIndex != -1 && orIndex < andIndex)
+            || (orIndex > 0 && andIndex == -1)) {
+            return trasIfCondition(StrUtil.subBefore(condi, "||", false))
+                    + " || " + trasIfCondition(StrUtil.subAfter(condi, "||", false));
+        }
+        // ************* 遞迴拆分條件判斷結束 *****************//
+
+
+        condi = condi.trim();
+
+        // 條件判斷是否為空(沒有邏輯運算符) isnull(ls_register_no) 、 dw_criteria.tran_date_s is null
+        if (condi.startsWith("isnull") || StrUtil.endWith(condi.trim(), "is null")) {
+
+            String param = "";
+
+            // isnull()格式
+            if (StrUtil.isWrap(condi, "isnull(", ")")) {
+                param = StrUtil.unWrap(condi, "isnull(", ")");
+            }
+            // is null 格式
+            else {
+                param = StrUtil.subBefore(condi, "is", false).trim();
+            }
+
+            // 處理參數 dw_criteria.tran_date_s
+            if (param.contains(".")) {
+                String pojo = param.split("\\.")[0];
+                String prop = param.split("\\.")[1];
+                param = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+            }
+
+            // 轉換結果
+            condi = param + " == null";
+        } else {
+
+            Map<String, String> map = splitCondiOperator(condi);
+            String operator = map.get("operator");
+            String condiLeft = map.get("condiLeft");
+            String condiRight = map.get("condiRight");
+
+            // 字串長度處理 len(trim(ls_close_flag)) 可進行 + - * / 運算
+            if (condiLeft.startsWith("len(")) {
+                condiLeft = tranIfLenTrimParas(condiLeft);
+            }
+            // 比較字串是否相等 ls_close_flag != "A"
+            else if (condiLeft.startsWith("ls_")){
+                if ("=".equals(operator) || "==".equals(operator)) {
+                    return StrUtil.format("{}.equals({})", condiRight, condiLeft);
+                } else {
+                    return StrUtil.format("!{}.equals({})", condiRight, condiLeft);
+                }
+            }
+
+
+            // 拼接結果
+            condi = StrUtil.format("{} {} {} ", condiLeft, operator, condiRight);
+
+        }
+
+
+
+        return condi;
+    }
+
+    // 處理if語句
     public static String doIf(String line, BufferedReader reader) throws IOException {
 
         // 替換關鍵字
@@ -43,84 +157,10 @@ public class IfMod {
         String comment = StrUtil.subAfter(afterLine, "//", true);
 
 
-        // 條件為isnull  if isnull(ls_register_no) 、 if dw_criteria.tran_date_s is null
-        if (condi.startsWith("isnull") || StrUtil.endWith(condi.trim(), "is null")) {
-            String param = "";
+        condi = trasIfCondition(condi);
 
-            // isnull()格式
-            if (StrUtil.isWrap(condi, "isnull(", ")")) {
-                // ls_register_no
-                param = StrUtil.unWrap(condi, "isnull(", ")");
-            }
-            // is null 格式
-            else {
-                // dw_criteria.tran_date_s
-                param = StrUtil.subBefore(condi, "is", false).trim();
-            }
+        System.out.println(condi);
 
-            // 處理參數 dw_criteria.tran_date_s
-            if (param.contains(".")) {
-                String pojo = param.split("\\.")[0];
-                String prop = param.split("\\.")[1];
-                param = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
-            }
-
-
-            // 關鍵字轉換
-            // func = func.replace("\'", "\"").replace("0", "BigDecimal.ZERO");
-            // 轉換結果
-            //line = StrUtil.indexedFormat("if ({0} == null) {1}", param, func) + ";";
-            condi = param + " == null";
-        }
-        // if len(trim(arg_bank_id)) + len(trim(arg_user_id)) = 13 then return 'Fail'
-        // if len(trim(arg_bank_id)) = 0 then return 'Fail'; → if (StringUtils.trimToEmpty(arg_bank_id).length() == ) return 'Fail';
-        else if (StrUtil.isWrap(firstStr, "len(", ")")) {  // firstStr: len(trim(arg_bank_id))
-
-            String operator = StrUtil.splitTrim(condi, " ").get(1);
-            if ("=".equals(operator)) operator = "==";
-
-            // 處理條件判斷式
-            String condiLeft = StrUtil.subBefore(condi, operator, false).trim();
-            // 條件判斷式左側
-            condiLeft = tranIfLenTrimParas(condiLeft);
-
-            // 關鍵字轉換
-            if (func.trim().startsWith("return")) {
-                func = KeywordMod.doReturn(func, true);
-            }
-
-            Integer number = ReUtil.getFirstNumber(line);
-
-            // 拼接結果
-            condi = StrUtil.format("{} {} {} ", condiLeft, operator, number);
-        }
-
-        else if (condi.startsWith("ls_")) {
-            // 處理 if 字串類型條件
-            condi = doIfLsCondi(condi);
-        }
-        // 條件 ll_pay_amt = 0
-        else if (StrUtil.startWithAny(condi, "ll_", "li_", "ld_")) {
-            String operator = StrUtil.subBetween(condi.trim(), " ", " ");
-            List<String> split = null;
-            if ("==".equals(operator)) {
-                split = StrUtil.splitTrim(condi, "=");
-            } else if ("=".equals(operator)) {
-                operator = "==";
-                split = StrUtil.splitTrim(condi, "=");
-            } else if (">".equals(operator)) {
-                split = StrUtil.splitTrim(condi, ">");
-            } else if ("<".equals(operator)) {
-                split = StrUtil.splitTrim(condi, "<");
-            } else if ("!=".equals(operator)) {
-                split = StrUtil.splitTrim(condi, "!=");
-            } else if ("<=".equals(operator)) {
-                split = StrUtil.splitTrim(condi, "<=");
-            } else if (">=".equals(operator)) {
-                split = StrUtil.splitTrim(condi, ">=");
-            }
-            condi = StrUtil.format("{}.intValue() {} {}", split.get(0), operator, split.get(1));
-        }
 
         // 處理func
         if (func.contains(".")) {
