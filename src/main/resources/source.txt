@@ -1,5 +1,13 @@
-if json.result = 0 then
-    messagebox('訊息','查無資料 !!')
-else
-    將 json 中之值代入 dw_list 中
-end if
+select count(*)
+      into :ll_row_cnt
+      from ar_trade
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and tran_date      between :ls_tran_s and :ls_tran_e
+       and bank_id        like :ls_bank_id
+       and ar_type        like :ls_ar_type
+       and custom_id      like :ls_custom_id
+       and nvl(close_flag,'N') = 'N'
+          ;
+    if isnull(ll_row_cnt) then ll_row_cnt = 0
+    if isnull(ll_row_cnt) then ll_row_cnt = 0
+    if null(ll_row_cnt) then ll_row_cnt = 0
