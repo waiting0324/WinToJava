@@ -108,7 +108,7 @@ public class KeywordMod {
         // 是數字
         else if (NumberUtil.isNumber(line)) {
             // 返回1則不處理
-            if (line.equals("1")) return "";
+            //if (line.equals("1")) return "";
             result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);\n");
         }
         // 返回JSON則標注待處理
@@ -116,6 +116,10 @@ public class KeywordMod {
             result.append("// TODO 處理返回值\n");
             result.append("new TransactionData(true, \"\", ResultEnum.SUCCESS, 返回值, null);\n");
         }
+        else {
+            result.append("// " + line);
+        }
+
 
         // 非單行If的情況則加上大括號
         //if (isIf == false) result.append("}\n");

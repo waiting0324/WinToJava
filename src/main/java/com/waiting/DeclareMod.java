@@ -17,7 +17,8 @@ public class DeclareMod {
         // 參數字串
         String paramStr = StrUtil.subBetween(line, "(", ")");
         // 參數關鍵字取代
-        paramStr = paramStr.replace("string", "String").replace("str", "String").replace("long", "BigDecimal");
+        paramStr = paramStr.replace("string", "String").replace("str", "String")
+                .replace("long", "BigDecimal").replace("decimal", "BigDecimal");
 
         String result = StrUtil.format("@Override\npublic TransactionData {} ({}) {\n", funcName, paramStr);
 

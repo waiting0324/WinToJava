@@ -98,6 +98,11 @@ public class Main {
                     line = AssignMod.doPojoPropAssign(line);
                 }
 
+                // switch處理
+                else if (StrUtil.startWithAny(trimLine, "choose", "case", "end choose")) {
+                    line = SwitchMod.doSwitch(line);
+                }
+
                 // 加上換行
                 result.append(line + "\n");
 
