@@ -1,6 +1,5 @@
 package com.waiting;
 
-import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.BufferedReader;
@@ -186,18 +185,28 @@ public class IfMod {
         line = line.replace("and", "&&").replace("or", "||")
                 .replace("\'", "\"").replace("<>", "!=");
 
-        if (!line.contains("then")) {
-            while (!(line += reader.readLine()).contains("then")) ;
+        if (!StrUtil.containsAny(line, "then", "{")) {
+            while (!StrUtil.containsAny(line += reader.readLine(), "then", "{")) ;
         }
 
         String trimLine = StrUtil.trimToEmpty(line);
 
         // 條件判斷式
-        String condi = StrUtil.subBetween(line, "if", "then").trim();
+        String condi = StrUtil.subBetween(line, "if", "then");
+        // 兼容Java語句
+        if (condi == null) condi =  StrUtil.subBetween(line, "if", "{");
+        condi = condi.trim();
+        if (StrUtil.isWrap(condi, "(", ")")) condi = StrUtil.unWrap(condi, "(", ")").trim();
+
         // 執行語句
         String func = null;
-        if (trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "then","//").trim();
-        if (!trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "then",true).trim();
+        if (trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "then","//");
+        if (!trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "then",true);
+        // 兼容Java語句
+        if (StrUtil.isBlank(func) && trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "{","//").trim();
+        if (StrUtil.isBlank(func) && !trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "{",true).trim();
+        func = func.replace("}", "").trim();
+
         // 註釋
         String comment = StrUtil.subAfter(trimLine, "//", true);
 

@@ -95,8 +95,9 @@ public class AssignMod {
         else if (StrUtil.isWrap(func, "\'")) {
             func = func.replace("\'", "\"");
         }
-        // 簡單加減計算  ll_ar_amt - ll_ar_recv_amt
-        else if (StrUtil.count(func, "-") == 1 || StrUtil.count(func, "+") == 1) {
+        // 簡單加減乘除計算  ll_ar_amt - ll_ar_recv_amt
+        else if (StrUtil.count(func, "-") == 1 || StrUtil.count(func, "+") == 1
+                || StrUtil.count(func, "*") == 1 || StrUtil.count(func, "/") == 1) {
             String operator = "";
             String[] params = null;
             if (func.contains("-")) {
@@ -105,6 +106,12 @@ public class AssignMod {
             } else if (func.contains("+")) {
                 operator = "add";
                 params = func.split("\\+");
+            } else if (func.contains("*")) {
+                operator = "multiply";
+                params = func.split("\\*");
+            } else if (func.contains("+")) {
+                operator = "divide";
+                params = func.split("/");
             }
             StrUtil.trim(params);
             func = StrUtil.format("{}.{}({})", params[0], operator, params[1]);

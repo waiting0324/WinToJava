@@ -83,7 +83,8 @@ public class KeywordMod {
         } else if (trimLine.startsWith("continue")) {
             return line + ";";
         } else if (trimLine.startsWith("else")) {
-            return line.replace("else", "} else {");
+//            return line.replace("else", "} else {");
+            return line.replace("else", " else ");
         }
 
         return "";
@@ -117,7 +118,7 @@ public class KeywordMod {
         }
 
         // 非單行If的情況則加上大括號
-        if (isIf == false) result.append("}\n");
+        //if (isIf == false) result.append("}\n");
 
         return result.toString();
     }

@@ -24,9 +24,6 @@ public class Main {
                 String line = reader.readLine();
                 String trimLine = StrUtil.trimToEmpty(line);
 
-                // 是否為處理SQL
-                boolean isSql = false;
-
                 // 到最後或是註解則略過
                 if (line == null) {
                     break;
@@ -36,7 +33,7 @@ public class Main {
                 // 如果是  標示呼叫API、聲明List、json開頭、開頭中文  則變成注釋
                 else if (StrUtil.containsIgnoreCase(line, "call API")
                         || StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
-                        || StrUtil.startWithIgnoreCase(trimLine, "json")
+//                        || StrUtil.startWithIgnoreCase(trimLine, "json")
                         || Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find()) {
                     line =  "// " + line;
                 }
@@ -57,7 +54,7 @@ public class Main {
                 }
 
                 // 參數賦值
-                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_")) {
+                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "arg_")) {
                     line = AssignMod.doAsignParam(line);
                 }
 
@@ -72,7 +69,9 @@ public class Main {
                 }
 
                 // 函數聲明
-                else if (StrUtil.startWithAny(trimLine, "Str")) {
+                else if (StrUtil.startWithAny(trimLine, "Str")
+                    || StrUtil.startWithIgnoreCase(trimLine, "json")
+                ) {
                     line = DeclareMod.doFuncDecl(line);
                 }
                 // 返回

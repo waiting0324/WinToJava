@@ -96,7 +96,8 @@ public class SqlMod {
                     // 除去干擾字符
                     sqlLine = sqlLine.replace("\"", "").replace("+", "").trim();
                     // 轉譯 nvl(AR_REC_AMT,0) 之情況，避免影響查詢欄位切割
-                    sqlLine = sqlLine.replace(",0)", "|0)");
+                    sqlLine = sqlLine.replace(",0)", "|0)").replace(",1)", "|1)")
+                            .replace(",2)", "|2)").replace(",3)", "|3)");
 
 
                     // 取出查詢欄位
@@ -129,7 +130,8 @@ public class SqlMod {
                     }
 
                     // 將前置轉譯恢復
-                    sqlLine = sqlLine.replace("|0)", ",0)");
+                    sqlLine = sqlLine.replace("|0)", ",0)").replace("|1)", ",1)")
+                            .replace("|2)", ",2)").replace("|3)", ",3)");
                 }
                 // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
                 else {
@@ -310,7 +312,7 @@ public class SqlMod {
         table = StrUtil.toCamelCase(table);
         table = "resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n";
         table += "resultMap = new HashMap();\n";
-        table += "if (resultList.size() != 0)  resultMap = resultList.get(0);\n";
+        table += "if (resultList.size() != 0)  resultMap = (Map<String, Object>) resultList.get(0);\n";
         result += table;
 
         // 查詢結果封裝 ls_temp = resultMap.get("LS_TEMP");
