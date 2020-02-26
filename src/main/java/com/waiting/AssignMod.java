@@ -167,7 +167,11 @@ public class AssignMod {
         /*if (split[1].contains("_")) {
             func = StrUtil.format("{}.subString({}.intValue()-1, {}.intValue() + {}))", split[0], split[1], split[1], Integer.parseInt(split[2])-2);
         } else {*/
-            func = StrUtil.format("{}.substring({}, {}); //TODO 更改位置", split[0], split[1], split[2]);
+            if (split.length > 2) {
+                func = StrUtil.format("{}.substring({}, {}); //TODO 更改位置", split[0], split[1], split[2]);
+            } else {
+                func = StrUtil.format("{}.substring(0, {}); //TODO 更改位置", split[0], split[1]);
+            }
         //}
         return func;
     }

@@ -1,0 +1,801 @@
+json tr_rcv_in_out(str cargo_location, str custom_id)
+    SELECT cargo_location,
+           tran_date,
+           seq,
+           bank_id,
+           ar_type,
+           custom_id,
+           ar_over_amt,
+           ar_det_over,
+           tran_date||seq  det_seq,
+           CUSTOM_ID       customer,
+      from tr_rcv_in_out
+     WHERE CARGO_LOCATION               =  :cargo_location
+       and CUSTOM_ID                 like  :custom_id
+       and AR_OVER_AMT - AR_DET_OVER   >=  0
+     ORDER by cargo_location ASC
+              custom_id      ASC
+              tran_date      ASC
+              seq            ASC
+     ;
+     取 det_seq 組成 json
+     return json
+
+
+json REGISTERED_CUSTOMER(str arg_cargo_location)
+    SELECT CUSTOM_ID,
+           CUSTOM_NAME
+      FROM(
+           SELECT REGISTER_NO  CUSTOM_ID,
+                  CUSTOM_NAME  CUSTOM_NAME
+             FROM REGISTERED_CUSTOMER
+            WHERE CARGO_LOCATION = arg_cargo_location
+              AND CUSTOM_NAME IS NOT NULL
+           UNION
+           SELECT AGENT_CODE CUSTOM_ID,
+  	        AGENT_NAME CUSTOM_NAME
+             FROM AGENT
+           UNION
+           SELECT CUSTOM_ID,
+  	        AR_CUST_NAME CUSTOM_NAME
+             FROM AR_RECEIVE
+            WHERE CARGO_LOCATION = arg_cargo_location
+              AND AR_CUST_NAME IS NOT NULL
+          )
+    GROUP BY CUSTOM_ID,
+             CUSTOM_NAME
+			 ;
+    select 之結果組成 json
+    return json
+
+
+json AR_TRADE(str is_where-查詢條件)
+    SELECT cargo_location
+           tran_date
+           seq
+           ar_type
+           bank_id
+           custom_id
+           tot_amount
+           ar_milus_amt
+           ar_over_amt
+           det_over
+           ar_desc
+           db_flag
+           vouch_no
+           start_date
+           end_date
+           close_flag
+           det_seq
+           bank_acct_no
+           ar_acct_no
+           tr_rcv_out_acct_no
+           tr_rcv_in_acct_no
+           tr_rcv_flag
+           upd_user
+           upd_date
+           remittance_fee
+           remittance_acct_no
+           cancel_times
+           auto
+           auto_write
+           virtual_account
+      from ar_trade
+     where is_where-查詢條件
+          ;
+    select 之結果組成 json
+    return json
+
+
+str AR_RECEIVE_DATE(str gs_uinfo.u_cargo_loca, str data_custom_id, int ll_ar_milus_amt)
+    select max(start_date || end_date)
+      into :ls_end_date
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:data
+       and ar_amt         =:ll_ar_milus_amt
+
+    if isnull(ls_end_date) then ls_end_date = ''
+    return ls_end_date
+
+
+json AR_RECEIVE_PAYMENT(str gs_uinfo.u_cargo_loca, str data_custom_id, str ls_start_date, str ls_end_date, int ll_ar_milus_amt)
+    select payment_type    , cust_attr    , ar_item
+      into :ls_payment_type, :ls_cust_attr, :ls_ar_item
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:data
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+       and ar_amt         =:ll_ar_milus_amt
+          ;
+    select 之結果組成 json
+    return json
+
+
+int AR_RECEIVE_CNT_2(str gs_uinfo.u_cargo_loca, str data_custom_id )
+    select count(*)
+      into :li_cnt
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:custom_id
+       and ar_amt - nvl(ar_rec_amt,0) > 0
+          ;
+    if isnull(li_cnt) then li_cnt = 0
+    return li_cnt
+
+
+json AR_RECEIVE_AMT_2(str gs_uinfo.u_cargo_loca, str data_custom_id )
+    select sum(ar_amt), sum(ar_rec_amt)
+      into :ll_ar_amt , :ll_ar_rec_amt
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:data
+       and ar_amt - nvl(ar_rec_amt,0) > 0
+          ;
+    if ll_ar_amt is null     then ll_ar_amt     = 0
+    if ll_ar_rec_amt is null then ll_ar_rec_amt = 0
+
+    select 之結果組成 json
+    return json
+
+
+json AR_RECEIVE_MIN(str gs_uinfo.u_cargo_loca, str data_custom_id, str ls_start_date, str ls_end_date)
+    select min(start_date), min(end_date), min(payment_type), min(cust_attr), max(ar_item)
+      into :ls_start_date , :ls_end_date , :ls_payment_type , :ls_cust_attr , :ls_ar_item
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :data
+       and start_date     > decode(:ls_start_date,null,'20020101',:ls_start_date)
+       and end_date       > decode(:ls_end_date,null,'20020101',:ls_end_date)
+       and nvl(ar_amt,0) - nvl(ar_rec_amt,0) > 0
+          ;
+    select 之結果組成 json
+    return json
+
+
+json AR_RECEIVE_AMT_3(str gs_uinfo.u_cargo_loca, str data_custom_id, str ls_start_date, str ls_end_date, str payment_type)
+    select sum(ar_amt), sum(ar_rec_amt)
+      into :ll_ar_amt , :ll_ar_rec_amt
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :data
+       and decode(:ls_start_date,' ','1',start_date) = decode(:ls_start_date,' ','1',:ls_start_date)
+       and decode(:ls_end_date,' ','1',end_date)     = decode(:ls_end_date,' ','1',:ls_end_date)
+       and payment_type   = :ls_payment_type
+          ;
+    select 之結果組成 json
+    return json
+
+
+str REGISTERED_CUSTOMER_ACCT_NO(str gs_uinfo.u_cargo_loca, str data_custom_id )
+    select acct_map.acct_no
+      into :ls_acct_no
+      from (
+            select registered_customer.cargo_location cargo_location,
+                   DECODE(NVL(registered_customer.flag_1221,'N'),'Y','1221','AR') ar_acct_no
+              from registered_customer
+             where registered_customer.cargo_location =:gs_uinfo.u_cargo_loca
+               and registered_customer.register_no    =:data
+           ) ar, acct_map
+     where ar.cargo_location = acct_map.cargo_location (+)
+       and ar.ar_acct_no     = acct_map.charge_type    (+)
+          ;
+     return ls_acct_no
+
+
+json REGISTERED_CUSTOMER_ATTR(str gs_uinfo.u_cargo_loca, str data_custom_id )
+    select nvl(cust_attribute,'N'), nvl(credit_no,' ')
+      into :ls_cust_attr          , :ls_credit_no
+      from registered_customer
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and register_no    =:data
+          ;
+    select 之結果組成 json
+    return json
+
+
+long CREDIT_MAINTAIN_ADJ(str gs_uinfo.u_cargo_loca, str ls_credit_no, str data_custom_id, str ls_start_date, str ls_end_date)
+    select nvl(adjust_vol,0)
+      into :ll_adjust_vol
+      from credit_maintain
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and register_no    = decode(:ls_credit_no,' ',:data,:ls_credit_no)
+       and adjust_type    = 'U'
+       and calculate_type = 'O'
+       and start_date     = :ls_start_date
+       and end_date       = :ls_end_date
+       and nvl(det_seq,'0') = '0'
+          ;
+    if isnull(ll_adjust_vol) then ll_adjust_vol = 0
+    return ll_adjust_vol
+
+
+json tr_rcv_in_out_amt(str gs_uinfo.u_cargo_loca, str ls_det_seq)
+    select custom_id,
+           ar_over_amt - NVL(ar_det_over,0)
+      into :ls_tmp_custom_id,
+           :ll_det_balance
+      from tr_rcv_in_out
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and tran_date      = substr(:ls_det_seq,1,8)
+       and seq            = substr(:ls_det_seq,9,4)
+          ;
+    select 之結果組成 json
+    return json
+
+
+json AR_RECEIVE_DATE_2(str gs_uinfo.u_cargo_loca, str data_custom_id )
+    select min(start_date), min(end_date)
+      into :ls_start_date , :ls_end_date
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :custom_id
+       and nvl(ar_amt,0) - nvl(ar_rec_amt,0) > 0
+          ;
+    select 之結果組成 json
+    return json
+
+
+int AC_ITEM_CNT()
+    select count(*)
+      into :li_cnt
+      from AC_ITEM
+    where ACCT_TYPE = 'BK'
+         ;
+    if isnull(li_cnt) then li_cnt = 0
+    return li_cnt
+
+
+str ACC_NO(str gs_uinfo.u_cargo_loca, str data_bank_id )
+    select acct_no
+      into :ls_acct_no
+      from acct_map
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and charge_type    =:data
+          ;
+    return ls_acct_no
+
+
+str ACCT_MAP_ACCT(str gs_uinfo.u_cargo_loca, str bank_id)
+    select acct_no
+      into :ls_acct_no
+      from acct_map
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and charge_type    =:ls_bank_id
+          ;
+    return ls_acct_no
+
+
+str AR_RECEIVE_PAYMENT_3(str gs_uinfo.u_cargo_loca, str custom_id, str ls_start_date, str ls_end_date)
+    select max(payment_type)
+      into :ls_payment_type
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :ls_start_date
+       and end_date       = :ls_end_date
+          ;
+    return ls_payment_type
+
+
+json AR_RECEIVE_AMT_X(str gs_uinfo.u_cargo_loca, str ls_custom_id, str ls_start_date, str ls_end_date, str ls_payment_type)
+    select ar_amt     , ar_rec_amt
+      into :ll_ar_amt , :ll_ar_rec_amt
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :ls_start_date
+       and end_date       = :ls_end_date
+       and payment_type   = :ls_payment_type
+          ;
+    select 之結果組成 json
+    return json
+
+
+json AR_RECEIVE_MAX(str gs_uinfo.u_cargo_loca, str custom_id, str data_start_date )
+    select max(end_date), max(payment_type)
+      into :ls_end_date , :ls_payment_type
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :start_date
+          ;
+    select 之結果組成 json
+    return json
+
+
+json AR_RECEIVE_AMT(str gs_uinfo.u_cargo_loca, str custom_id, str data_start_date, str end_date, str ls_payment_type)
+    select nvl(ar_amt,0), nvl(ar_rec_amt,0)
+      into :ll_ar_amt , :ll_ar_rec_amt
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :data
+       and end_date       = :ls_end_date
+       and payment_type   = :ls_payment_type
+          ;
+    select 之結果組成 json
+    return json
+
+
+int AR_RECEIVE_CNT(str gs_uinfo.u_cargo_loca, str ls_custom_id, str ls_start_date, str data_end_date)
+    select count(*)
+      into :li_cnt
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :ls_start_date
+       and end_date       = :end_date
+       and nvl(ar_amt,0) - nvl(ar_rec_amt,0) > 0
+          ;
+    if isnull(li_cnt) then li_cnt = 0
+    return li_cnt
+
+
+str AR_RECEIVE_PAYMENT_2(str gs_uinfo.u_cargo_loca, str custom_id, str ls_start_date, str ls_end_date)
+    select max(payment_type)
+      into :ls_payment_type
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and decode(:ls_start_date,' ','1',start_date) = decode(:ls_start_date,' ','1',:ls_start_date)
+       and decode(:ls_end_date,' ','1',end_date)     = decode(:ls_end_date,' ','1',:ls_end_date)
+          ;
+    return ls_payment_type
+
+
+int ACCT_MAP_CNT(str data)
+    select count(*)
+      into :li_cnt
+      from acct_map
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and trim(acct_no)  = :data
+          ;
+    if isnull(li_cnt) then li_cnt = 0
+    return li_cnt
+
+
+long tr_rcv_in_out_sum(str gs_uinfo.u_cargo_loca, str data_det_seq, str ls_bank_id, str ls_ar_type, str ls_custom_id)
+    select sum(ar_over_amt - ar_det_over)
+      into :ll_det_balance
+      from tr_rcv_in_out
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and tran_date      = substr(:data,1,8)
+       and seq            = substr(:data,9,4)
+       and decode(:ls_bank_id,null,'1',bank_id) = decode(:ls_bank_id,null,'1',:ls_bank_id)
+       and decode(:ls_ar_type,null,'1',ar_type) = decode(:ls_ar_type,null,'1',:ls_ar_type)
+       and decode(:ls_custom_id,null,'1',custom_id) = decode(:ls_custom_id,null,'1',:ls_custom_id)
+          ;
+    return ll_det_balance
+
+
+int AR_RECEIVE_CNT_3(str gs_uinfo.u_cargo_loca, str ls_custom_id, str ls_start_date, str ls_end_date)
+    select count(*)
+      into :li_cnt
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:ls_custom_id
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+       and ar_amt        < 0
+       ;
+    if isnull(li_cnt) then li_cnt = 0
+    return li_cnt
+
+
+long AR_RECEIVE_AMT_5(str gs_uinfo.u_cargo_loca, str ls_custom_id, str ls_start_date, str ls_end_date)
+    select ar_amt
+      into :ll_ar_mil_amt
+      from ar_receive
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and custom_id      =:ls_custom_id
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+          ;
+    return ll_ar_mil_amt
+
+
+str AR_TRADE_SEQ(str gs_uinfo.u_cargo_loca, str ls_tran_date)
+    select max(seq)
+      into :ls_seq
+      from ar_trade
+     where cargo_location =:gs_uinfo.u_cargo_loca
+       and tran_date      =:ls_tran_date
+          ;
+    return ls_seq
+
+
+int AR_RECEIVE_CNT_4(str gs_uinfo.u_cargo_loca, str ls_custom_id, str ls_start_date, str ls_end_date)
+    select count(*)
+      into :ll_cnt
+      from ar_receive
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and custom_id      = :ls_custom_id
+       and start_date     = :ls_start_date
+       and end_date       = :ls_end_date
+          ;
+    if isnull(ll_cnt) then ll_cnt = 0
+    return ll_cnt
+
+
+str AR_TRADE_CLOSE(str cargo_location, str tran_date, str seq)
+    select nvl(close_flag,'N')
+      into :ls_close_flag
+      from ar_trade
+     where cargo_location =:ls_cargo_location
+       and tran_date      =:ls_tran_date
+       and seq            =:ls_seq
+          ;
+    return ls_close_flag
+
+
+int AR_TRADE_DEL(str cargo_location, str tran_date, str seq)  // *****
+    delete ar_trade
+     where cargo_location = cargo_location
+       and tran_date      = tran_date
+       and seq            = seq
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+int AR_TRADE_INS(json dw_free)
+    將 dw_free 中之欄位新增入 ar_trade 中
+
+    insert into ar_trade
+          (cargo_location
+          ,tran_date
+          ,seq
+          ,ar_type
+          ,bank_id
+          ,custom_id
+          ,tot_amount
+          ,ar_milus_amt
+          ,ar_over_amt
+          ,det_over
+          ,ar_desc
+          ,db_flag
+          ,vouch_no
+          ,start_date
+          ,end_date
+          ,close_flag
+          ,det_seq
+          ,bank_acct_no
+          ,ar_acct_no
+          ,tr_rcv_out_acct_no
+          ,tr_rcv_in_acct_no
+          ,tr_rcv_flag
+          ,upd_user
+          ,upd_date
+          ,remittance_fee
+          ,remittance_acct_no
+          ,cancel_times
+          ,auto
+          ,auto_write
+          ,virtual_account)
+     value(json dw_free)
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+int AR_TRADE_UPD(json dw_free 欄位)
+    update ar_trade
+       set cargo_location      = json.data
+          ,tran_date           = json.data
+          ,seq                 = json.data
+          ,ar_type             = json.data
+          ,bank_id             = json.data
+          ,custom_id           = json.data
+          ,tot_amount          = json.data
+          ,ar_milus_amt        = json.data
+          ,ar_over_amt         = json.data
+          ,det_over            = json.data
+          ,ar_desc             = json.data
+          ,db_flag             = json.data
+          ,vouch_no            = json.data
+          ,start_date          = json.data
+          ,end_date            = json.data
+          ,close_flag          = json.data
+          ,det_seq             = json.data
+          ,bank_acct_no        = json.data
+          ,ar_acct_no          = json.data
+          ,tr_rcv_out_acct_no  = json.data
+          ,tr_rcv_in_acct_no   = json.data
+          ,tr_rcv_flag         = json.data
+          ,upd_user            = json.data
+          ,upd_date            = json.data
+          ,remittance_fee      = json.data
+          ,remittance_acct_no  = json.data
+          ,cancel_times        = json.data
+          ,auto                = json.data
+          ,auto_write          = json.data
+          ,virtual_account     = json.data
+     where cargo_location = json.cargo_location
+       and tran_date      = json.tran_date
+       and seq            = json.seq
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+int AR_TRADE_EXIST(str ls_cargo, str ls_tran_date, str ls_seq, str ls_custom_id, str ls_ar_type, str ls_start_date, str ls_end_date)
+    select count(*)
+      into :li_exist
+      from ar_trade
+     where cargo_location =:ls_cargo
+       and tran_date      =:ls_tran_date
+       and seq            =:ls_seq
+       and custom_id      =:ls_custom_id
+       and ar_type        =:ls_ar_type
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+          ;
+    if isnull(li_exit) then li_exit = 0
+    return li_exit
+
+
+json tr_rcv_in_out_org_amt(str ls_cargo, str ls_tran_date, str ls_seq, str ls_custom_id, str ls_ar_type, str ls_bank_id)
+    select ar_over_amt , ar_det_over
+      into :ll_org_amt1, :ll_org_amt2
+      from tr_rcv_in_out
+     where cargo_location =:ls_cargo
+       and tran_date      =:ls_tran_date
+       and seq            =:ls_seq
+       and custom_id      =:ls_custom_id
+       and ar_type        =:ls_ar_type
+       and bank_id        =:ls_bank_id
+          ;
+    select 之結果組成 json
+    return json
+
+
+int tr_rcv_in_out_del(str ls_cargo, str ls_tran_date, str ls_seq, str ls_custom_id, str ls_ar_type, str ls_bank_id)
+    delete from tr_rcv_in_out
+     where cargo_location =:ls_cargo
+       and tran_date      =:ls_tran_date
+       and seq            =:ls_seq
+       and custom_id      =:ls_custom_id
+       and ar_type        =:ls_ar_type
+       and bank_id        =:ls_bank_id
+       and nvl(ar_det_over,0) = 0
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+json tr_rcv_in_out_org_amt_2(str ls_cargo, str ls_det_seq, str ls_custom_id, str ls_ar_type, str ls_bank_id)
+    select ar_over_amt , ar_det_over
+      into :ll_org_amt1, :ll_org_amt2
+      from tr_rcv_in_out
+     where cargo_location =:ls_cargo
+       and tran_date      =substr(:ls_det_seq,1,8)
+       and seq            =substr(:ls_det_seq,9)
+       and custom_id      =:ls_custom_id
+       and ar_type        =:ls_ar_type
+       and bank_id        =:ls_bank_id
+          ;
+    select 之結果組成 json
+    return json
+
+
+int tr_rcv_in_out_upd(str gs_uinfo.u_id, str gs_uinfo.u_cargo_loca, str ls_det_seq, str ls_custom_id, str ls_ar_type, str ls_bank_id, long ll_det_over)
+    update tr_rcv_in_out
+       set ar_det_over    = ar_det_over -:ll_det_over,
+           upd_date       = sysdate,
+           upd_user       =:gs_uinfo.u_id
+     where cargo_location =:ls_cargo
+       and tran_date      =substr(:ls_det_seq,1,8)
+       and seq            =substr(:ls_det_seq,9)
+       and custom_id      =:ls_custom_id
+       and ar_type        =:ls_ar_type
+       and bank_id        =:ls_bank_id
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+json AR_RECEIVE_AMT_4(str gs_uinfo.u_cargo_loca, str ls_start_date, str ls_end_date, str ls_custom_id, long ll_ar_milus_amt)
+    select ar_amt      , ar_rec_amt  , remark
+      into :ll_org_amt1, :ll_org_amt2, :ls_remark
+      from ar_receive
+     where cargo_location =:ls_cargo
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+       and custom_id      =:ls_custom_id
+       and ar_amt        >=:ll_ar_milus_amt
+          ;
+    select 之結果組成 json
+    return json
+
+
+int AR_RECEIVE_UPD(str gs_uinfo.u_cargo_loca, str ls_start_date, str ls_end_date, str ls_custom_id, long ll_org_amt1,
+		   long ll_ar_milus_amt, str ls_remark)
+    update ar_receive
+       set ar_rec_amt     = nvl(ar_rec_amt,0) - :ll_ar_milus_amt,
+           remark         = :ls_remark
+     where cargo_location =:ls_cargo
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+       and custom_id      =:ls_custom_id
+       and ar_amt         =:ll_org_amt1
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+json REGISTERED_CUSTOMER_CRE(str gs_uinfo.u_cargo_loca, str ls_custom_id)
+    select credit_no    , cust_attribute, count(*)
+      into :ls_credit_no, :ls_cust_attr , :li_credit
+      from registered_customer
+     where cargo_location   =:ls_cargo
+            and register_no =:ls_custom_id
+     group by credit_no, cust_attribute
+          ;
+    select 之結果組成 json
+    return json
+
+
+int CREDIT_MAINTAIN_CNT(str gs_uinfo.u_cargo_loca, str ls_used_cust_id, str ls_tran_date,
+                        str ls_start_date, str ls_end_date, str ls_seq, str ll_ar_milus_amt, str ll_ar_over_amt)
+    select count(*)
+      into :li_credit
+      from credit_maintain
+     where cargo_location =:ls_cargo
+       and register_no    =:ls_used_cust_id
+       and adjust_type    ='U'
+       and adjust_date    =:ls_tran_date
+       and start_date     =:ls_start_date
+       and end_date       =:ls_end_date
+       and calculate_type ='O'
+       and det_seq        =:ls_seq
+       and adjust_vol     =:ll_ar_milus_amt + :ll_ar_over_amt
+          ;
+    if isnull(li_credit) then li_credit = 0
+    return li_credit
+
+
+long REGISTERED_CUSTOMER_VOL(str gs_uinfo.u_cargo_loca, str ls_used_cust_id)
+    select used_vol
+      into :ll_b_vol
+      from registered_customer
+     where cargo_location =:ls_cargo
+       and register_no    =:ls_used_cust_id
+    for update of used_vol  // ***** record lock
+       ;
+    if isnull(ll_b_vol) then ll_b_vol = 0
+    return ll_b_vol
+
+
+int CREDIT_MAINTAIN_DEL(str gs_uinfo.u_cargo_loca, str ls_used_cust_id, str ls_tran_date,
+                        str ll_ar_milus_amt, str ll_ar_over_amt, str ls_start_date, str ls_end_date, str ls_seq)
+    delete CREDIT_MAINTAIN
+     where CARGO_LOCATION =:ls_cargo
+       and REGISTER_NO    =:ls_used_cust_id
+       and ADJUST_TYPE    ='U'
+       and ADJUST_DATE    =:ls_tran_date
+       and ADJUST_VOL     =:ll_ar_milus_amt + :ll_ar_over_amt
+       and CALCULATE_TYPE ='O'
+       and START_DATE     =:ls_start_date
+       and END_DATE       =:ls_end_date
+       and DET_SEQ        =:ls_seq
+          ;
+    if error then
+        rollback
+        return 0
+    else
+        return 1
+    end if
+
+
+int REGISTERED_CUSTOMER_UPD(str gs_uinfo.u_cargo_loca, str ls_used_cust_id,
+	                    long ll_b_vol, long ll_ar_milus_amt, long ll_ar_over_amt)
+    update registered_customer
+       set used_vol       =:ll_b_vol + :ll_ar_milus_amt + :ll_ar_over_amt
+     where cargo_location =:ls_cargo
+       and register_no    =:ls_used_cust_id
+          ;
+    if error then
+        return 0
+    else
+        return 1
+    end if
+
+
+int AR_TRADE_CNT(str gs_uinfo.u_cargo_loca, str ls_tran_s, str ls_tran_e, str ls_bank_id, str ls_ar_type, str ls_custom_id)
+    select count(*)
+      into :ll_row_cnt
+      from ar_trade
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and tran_date      between :ls_tran_s and :ls_tran_e
+       and bank_id        like :ls_bank_id
+       and ar_type        like :ls_ar_type
+       and custom_id      like :ls_custom_id
+       and nvl(close_flag,'N') = 'N'
+          ;
+    if isnull(ll_row_cnt) then ll_row_cnt = 0
+    return ll_row_cnt
+
+    ***** 04_new det_seq
+
+json det_seq_P(str cargo_location, str custom_id)
+    SELECT tr_rcv_in_out.cargo_location
+           tr_rcv_in_out.tran_date
+           tr_rcv_in_out.seq
+           tr_rcv_in_out.bank_id
+           tr_rcv_in_out.ar_type
+           tr_rcv_in_out.custom_id
+           tr_rcv_in_out.ar_over_amt
+           tr_rcv_in_out.ar_det_over
+           tran_date || seq           det_seq
+           TR_RCV_IN_OUT.CUSTOM_ID    customer
+      from tr_rcv_in_out
+    WHERE TR_RCV_IN_OUT.CARGO_LOCATION  =    :cargo_location
+      And TR_RCV_IN_OUT.CUSTOM_ID       like :custom_id
+      and TR_RCV_IN_OUT.AR_OVER_AMT - TR_RCV_IN_OUT.AR_DET_OVER >= 0
+    ORDER by cargo_location A, custom_id A, tran_date A, seq A
+         ;
+    取 select 出之 det_seq 組成 json
+    return json
+
+json custom_name_P(str cargo_location)
+    SELECT CUSTOM_ID,CUSTOM_NAME
+     FROM(
+          SELECT REGISTERED_CUSTOMER.REGISTER_NO  CUSTOM_ID,
+                 REGISTERED_CUSTOMER.CUSTOM_NAME  CUSTOM_NAME
+            FROM REGISTERED_CUSTOMER
+           WHERE CARGO_LOCATION =:cargo_location
+             AND REGISTERED_CUSTOMER.CUSTOM_NAME IS NOT NULL
+          UNION
+          SELECT AGENT_CODE CUSTOM_ID,
+                 AGENT_NAME CUSTOM_NAME
+            FROM AGENT
+          UNION
+          SELECT CUSTOM_ID,
+                 AR_CUST_NAME CUSTOM_NAME
+            FROM AR_RECEIVE
+           WHERE CARGO_LOCATION = :cargo_location
+             AND AR_RECEIVE.AR_CUST_NAME IS NOT NULL
+         )
+    GROUP BY CUSTOM_ID,
+             CUSTOM_NAME
+    order by custom_id A
+         ;
+    取 select 出之 custom_id, custom_name 組成 json
+    return json
+
+
+json bank_id_P(str bank_id)
+    select id_no, id_desc
+      from ac_item_bk
+    ;
+    取 select 之結果組成 json
+    return json
+
+
+json bank_desc(str bank_id)
+    select id_no, id_desc
+      from ac_item_bk
+     where id_no = :bank_id
+    ;
+    取 select 之結果組成 json
+    return json

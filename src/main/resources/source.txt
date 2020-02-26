@@ -1,8 +1,7 @@
-choose case ls_auto
-       case 'V'  // 使用虛擬帳號銷帳
-               is_where += " and nvl(auto,'N') ='Y' and ar_trade.virtual_account is not null and upd_user = 'system'"
-       case 'Y'  // 使用下載EXCEL檔案 沖銷
-               is_where += " and nvl(auto,'N') ='Y' and ar_trade.virtual_account is null"
-       case 'N'
-               is_where += " and nvl(auto,'N') ='" + ls_auto + "'"
-end choose
+if len(trim(ls_end_date)) = 16 then
+                 ls_start_date = substr(ls_end_date,1,8)
+                 ls_end_date   = substr(ls_end_date,9)
+                 
+                 json = call API AR_RECEIVE_PAYMENT(str gs_uinfo.u_cargo_loca, str data, str ls_start_date, str ls_end_date, int ll_ar_milus_amt)
+                 自 json 中取 ls_payment_type, ls_cust_attr, ls_ar_item
+             end if

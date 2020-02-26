@@ -265,11 +265,14 @@ public class SqlMod {
         return params;
     }
 
-    // 處理SQL查詢語句
-    public static String doSelect(String line, BufferedReader reader) throws IOException {
+    //
 
-        // 格式化過後的SQL語句
-        String oriSql = getOriSql(line, reader);
+    /**
+     * 處理SQL查詢語句
+     * @param oriSql 格式化過後的SQL語句
+     */
+    public static String doSelect(String oriSql) throws IOException {
+
         // 是否為 此種SQL類型 select custom_id into :ls_custom_id
         boolean isIntoTypeSql = StrUtil.containsIgnoreCase(oriSql, "into");
         // 請求查詢的欄位

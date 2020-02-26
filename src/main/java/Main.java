@@ -30,12 +30,16 @@ public class Main {
                 } else if (trimLine.startsWith("//") || trimLine.startsWith("*")) {
                     //continue;
                 }
+                // API 呼叫
+                else if (StrUtil.containsIgnoreCase(line, "call API")) {
+                    line = ApiMod.doApi(line, writer);
+                }
                 // 如果是  標示呼叫API、聲明List、json開頭、開頭中文  則變成注釋
                 else if (StrUtil.containsIgnoreCase(line, "call API")
                         || StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
 //                        || StrUtil.startWithIgnoreCase(trimLine, "json")
                         || Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find()) {
-                    line =  "// " + line;
+                    line =  "// " + line.trim();
                 }
 
                 // 變量聲明
@@ -65,7 +69,8 @@ public class Main {
 
                 // 查詢語句
                 else if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
-                    line = SqlMod.doSelect(line, reader);
+                    String oriSql = SqlMod.getOriSql(line, reader);
+                    line = SqlMod.doSelect(oriSql);
                 }
 
                 // 函數聲明
