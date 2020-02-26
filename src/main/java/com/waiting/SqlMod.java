@@ -198,7 +198,7 @@ public class SqlMod {
                 }
             }
             // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
-            else {
+            else if (line.contains(".")){
                 String selectColumn = StrUtil.subBetween(line, ".", " ");
                 // select register_no
                 //      from registered_customer
@@ -209,6 +209,18 @@ public class SqlMod {
                     selectColumn = selectColumn.replace(",", "");
                 }
                 selecColumns.add(selectColumn);
+            }
+            // 沒有into且只有查詢欄位 select seq, custom_id, start_date
+            else {
+                System.out.println(line);
+                String trimLine = line.replace("+", "").replace("\"", "")
+                        .replace("select", "").trim();
+                // 有內置函數
+                if (trimLine.contains("(") && trimLine.contains(")")) {
+                    selecColumns.add(StrUtil.subBetween(trimLine, "(", ",").toUpperCase());
+                } else {
+                    selecColumns.add(trimLine.replace(",", "").toUpperCase());
+                }
             }
         }
 
@@ -335,7 +347,7 @@ public class SqlMod {
                     result = result + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
                 }
             } else {
-                result = result + "ls_" + selecColumn.toLowerCase() + " = resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                result = result + "ls_" + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
             }
         }
 

@@ -170,7 +170,7 @@ public class IfMod {
                         if ("+".equals(operator)) {
                             condiLeft = condiLeft + ".add(";
                         } else if ("-".equals(operator)) {
-                            condiLeft = condiLeft + ".substarct(";
+                            condiLeft = condiLeft + ".subtract(";
                         }
                     }
                 }
@@ -210,9 +210,9 @@ public class IfMod {
         if (trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "then","//");
         if (!trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "then",true);
         // 兼容Java語句
-        if (StrUtil.isBlank(func) && trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "{","//").trim();
+        /*if (StrUtil.isBlank(func) && trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "{","//").trim();
         if (StrUtil.isBlank(func) && !trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "{",true).trim();
-        func = func.replace("}", "").trim();
+        func = func.replace("}", "").trim();*/
 
         // 註釋
         String comment = StrUtil.subAfter(trimLine, "//", true);
@@ -229,7 +229,7 @@ public class IfMod {
             func = StrUtil.format("{}.{}({})", pojo, StrUtil.genSetter(StrUtil.toCamelCase(prop)), value);
         }
         // 不是空則為簡單參數賦值
-        else if (!"".equals(func)) {
+        else if (StrUtil.isNotBlank(func)) {
             func = AssignMod.doAsignParam(func);
             // 去除分號；
             func = func.substring(0, func.length()-1);
@@ -237,9 +237,9 @@ public class IfMod {
 
 
         // 替只有一行的func加上下括號
-        if (!"".equals(func)) func = func + "; }";
+        if (StrUtil.isNotBlank(func)) func = func + "; }";
 
-        if (!"".equals(comment)) {
+        if (StrUtil.isNotBlank(comment)) {
             line = StrUtil.format("if ({}) { {}  // {}", condi, func, comment);
         } else {
             line = StrUtil.format("if ({}) { {} ", condi, func);

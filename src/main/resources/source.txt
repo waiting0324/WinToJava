@@ -1,21 +1,13 @@
-
-                    li_result = call API REGISTERED_CUSTOMER_UPD(gs_uinfo.u_cargo_loca,ls_used_cust_id,
-					                         ll_b_vol,ll_ar_milus_amt,ll_ar_over_amt)
-                end if
-            end if
-        end if
-    end if
-end if
-
-dw_free.close_flag   = 'N'
-dw_free.cancel_times = li_cancel_times + 1
-
-li_result = call API AR_TRADE_UPD(dw_free 欄位)
-
-if li_result = 1 then
-    commit ;
-    messagebox("訊息","取消過帳成功")
-else
-    rollback ;
-    messagebox("訊息","取消過帳失敗")
-end if
+update ar_trade 
+       set close_flag     = 'Y'
+     where cargo_location = :gs_uinfo.u_cargo_loca
+       and tran_date      = :ls_tran_date
+       and seq            = :ls_seq
+       and nvl(close_flag,'N') = 'N'
+          ;  
+    if sqlca.sqlcode <> 0 then 
+        rollback ;
+        
+        json.result_message 加入 messagebox('訊息','更新應收帳款收回資料之過帳狀態失敗 '+'SQLCODE:'+string(sqlca.sqlcode)+' '+SQLCA.SQLErrText)
+        return json
+    end if          

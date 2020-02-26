@@ -53,7 +53,8 @@ public class MainMod {
                 }
                 // 如果是  聲明List、json開頭、開頭中文  則變成注釋
                 else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
-                        || (Pattern.compile( "[\u4e00-\u9fa5]" ).matcher(trimLine).find() && !trimLine.contains("mes"))) {
+                        || (Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find() && !trimLine.contains("mes")
+                            && !trimLine.contains("//"))) {
                     line =  "// " + line.trim();
                 }
 

@@ -79,6 +79,9 @@ public class AssignMod {
 
     // 參數賦值
     public static String doAsignParam(String line) {
+
+        if (StrUtil.isBlank(line)) return "";
+
         String leftParam = line.split("=")[0].trim();
         String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
         String comment = StrUtil.subAfter(line, "//", true);
@@ -140,7 +143,6 @@ public class AssignMod {
             String pojo = split.get(0);
             String prop = split.get(1);
             func = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
-
 
             if (isTrim)  func = StrUtil.format("StringUtils.trimToEmpty({})", func);
         }
