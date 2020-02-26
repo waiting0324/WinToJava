@@ -1,7 +1,33 @@
-if len(trim(ls_end_date)) = 16 then
-                 ls_start_date = substr(ls_end_date,1,8)
-                 ls_end_date   = substr(ls_end_date,9)
-                 
-                 json = call API AR_RECEIVE_PAYMENT(str gs_uinfo.u_cargo_loca, str data, str ls_start_date, str ls_end_date, int ll_ar_milus_amt)
-                 自 json 中取 ls_payment_type, ls_cust_attr, ls_ar_item
+if len(trim(ls_custom_id)) = 4 then
+             ls_cust_attr = ''
+
+             json = call API REGISTERED_CUSTOMER_ATTR(str gs_uinfo.u_cargo_loca, str custom_id)
+             取 json 中之 ls_cust_attr, ls_credit_no
+
+             if isnull(ls_cust_attr) then ls_cust_attr = 'N'
+             if isnull(ls_credit_no) then
+                 ls_credit_no = ' '
+             else
+                 if len(trim(ls_credit_no)) < 4 then ls_credit_no = ' '
              end if
+
+             if ls_cust_attr = 'B' then
+                 dw_free.auto_write = 'N'
+             else
+                 ls_end_date = dw_free.end_date
+                 // 檢核是否有自行輸入之使用額度沖銷資料
+                 ll_adjust_vol = call API CREDIT_MAINTAIN_ADJ(str gs_uinfo.u_cargo_loca, str credit_no, str custom_id, str data(start_date), str end_date)
+
+                 if ll_adjust_vol <> 0 then
+                     ls_mesg = ''
+                     if ls_credit_no <> ' ' then ls_mesg = ':額度共用客編'+ls_credit_no
+                     if messagebox('訊息'+ls_mesg,'客服組已輸入此客戶沖銷使用額度資料,金額：'+string(ll_adjust_vol)+' 要產生額度沖銷資料請按Ｙｅｓ',Question!,YesNo!,2) = 2 then
+                         dw_free.auto_write = 'N'
+                     else
+                         dw_free.auto_write = 'Y'
+                     end if
+                 else
+                     dw_free.auto_write = 'Y'
+                 end if
+             end if
+         end if

@@ -4,10 +4,7 @@ import cn.hutool.core.util.StrUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author 6550
@@ -96,8 +93,16 @@ public class SqlMod {
                     // 除去干擾字符
                     sqlLine = sqlLine.replace("\"", "").replace("+", "").trim();
                     // 轉譯 nvl(AR_REC_AMT,0) 之情況，避免影響查詢欄位切割
-                    sqlLine = sqlLine.replace(",0)", "|0)").replace(",1)", "|1)")
-                            .replace(",2)", "|2)").replace(",3)", "|3)");
+                    LinkedList temp = new LinkedList();
+                    char[] chars = sqlLine.toCharArray();
+                    for (int j = 0; j < chars.length; j++) {
+                        char c = chars[j];
+                        if (c == '(') temp.push("(");
+                        if (c == ')') temp.pop();
+                        if (c == ',' && temp.size() != 0) {
+                            sqlLine = StrUtil.sub(sqlLine, 0, j) + "$" + StrUtil.sub(sqlLine, j+1, sqlLine.length());
+                        }
+                    }
 
 
                     // 取出查詢欄位
@@ -130,8 +135,7 @@ public class SqlMod {
                     }
 
                     // 將前置轉譯恢復
-                    sqlLine = sqlLine.replace("|0)", ",0)").replace("|1)", ",1)")
-                            .replace("|2)", ",2)").replace("|3)", ",3)");
+                    sqlLine = sqlLine.replace("$", ",");
                 }
                 // 此種SQL類型 SELECT CUST_VIRTUAL_ACCOUNT.CARGO_LOCATION
                 else {

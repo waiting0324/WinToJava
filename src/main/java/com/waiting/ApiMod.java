@@ -1,6 +1,7 @@
 package com.waiting;
 
 import cn.hutool.core.util.StrUtil;
+import com.sun.tools.javac.Main;
 
 import java.io.*;
 
@@ -37,9 +38,10 @@ public class ApiMod {
                 isApiFind = true;
 
                 // 轉譯API內容
-                result.append("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用開始\n");
+                /*result.append("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用開始\n");
                 String oriSql = SqlMod.getOriSql(apiReader.readLine(), apiReader);
-                result.append(SqlMod.doSelect(oriSql));
+                result.append(SqlMod.doSelect(oriSql));*/
+                MainMod.doMain(apiReader, resultWritter, true);
                 break;
             }
         }
