@@ -35,19 +35,22 @@ public class ApiMod {
             if (StrUtil.containsIgnoreCase(apiLine, apiName)
                     && StrUtil.subAfter(apiLine, apiName, false).trim().startsWith("(")) {
 
+                // 解決 API 在多行才聲明完問題
+                if (!apiLine.contains(")")) {
+                    while ((apiLine = apiReader.readLine()).contains(")")) break;
+                }
+
                 isApiFind = true;
+                resultWritter.write("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用開始\n");
 
                 // 轉譯API內容
-                /*result.append("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用開始\n");
-                String oriSql = SqlMod.getOriSql(apiReader.readLine(), apiReader);
-                result.append(SqlMod.doSelect(oriSql));*/
                 MainMod.doMain(apiReader, resultWritter, true);
                 break;
             }
         }
 
-        if (isApiFind) result.append("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用結束\n");
-        else if (!isApiFind) result.append("// TODO 未發現 API " + apiName + " 等待手動新增 \n");
+        if (isApiFind) resultWritter.write("// >>>>>>>> API " + apiName + " <<<<<<<<< 調用結束\n");
+        else if (!isApiFind) resultWritter.write("// TODO 未發現 API " + apiName + " 等待手動新增 \n");
 
         return result.toString();
     }

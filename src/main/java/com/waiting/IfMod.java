@@ -39,6 +39,13 @@ public class IfMod {
         } else if (condi.contains("<")) {
             logicOpeartor = "<";
         }
+        // 特殊異常情況處理
+        else {
+            logicOpeartor = "??";
+            condiLeft = StrUtil.splitTrim(condi, logicOpeartor).get(0);
+            condi = condiLeft + " ?? " + condiLeft;
+        }
+
 
         condiLeft = StrUtil.splitTrim(condi, logicOpeartor).get(0);
         condiRight = StrUtil.splitTrim(condi, logicOpeartor).get(1);
@@ -182,7 +189,7 @@ public class IfMod {
     public static String doIf(String line, BufferedReader reader) throws IOException {
 
         // 替換關鍵字
-        line = line.replace("and", "&&").replace("or", "||")
+        line = line.replace("and", "&&").replace(" or ", " || ")
                 .replace("\'", "\"").replace("<>", "!=");
 
         if (!StrUtil.containsAny(line, "then", "{")) {

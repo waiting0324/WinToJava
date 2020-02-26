@@ -43,12 +43,16 @@ public class MainMod {
                 }
                 // API 呼叫
                 else if (StrUtil.containsIgnoreCase(line, "call API")) {
+
+                    // 解決Call API 在多行才聲明完問題
+                    if (!line.contains(")")) {
+                        while ((line = line + reader.readLine()).contains(")")) break;
+                    }
+
                     line = ApiMod.doApi(line, writer);
                 }
-                // 如果是  標示呼叫API、聲明List、json開頭、開頭中文  則變成注釋
-                else if (StrUtil.containsIgnoreCase(line, "call API")
-                        || StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
-//                        || StrUtil.startWithIgnoreCase(trimLine, "json")
+                // 如果是  聲明List、json開頭、開頭中文  則變成注釋
+                else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
                         || (Pattern.compile( "[\u4e00-\u9fa5]" ).matcher(trimLine).find() && !trimLine.contains("mes"))) {
                     line =  "// " + line.trim();
                 }
@@ -92,7 +96,7 @@ public class MainMod {
                 }
                 // 返回
                 else if (trimLine.startsWith("return")) {
-                    line = KeywordMod.doReturn(line, false);
+                    line = KeywordMod.doReturn(line);
                 }
                 // 關鍵字
                 else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue", "else")) {

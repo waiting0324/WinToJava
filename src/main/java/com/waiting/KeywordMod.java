@@ -83,14 +83,17 @@ public class KeywordMod {
         } else if (trimLine.startsWith("continue")) {
             return line + ";";
         } else if (trimLine.startsWith("else")) {
-//            return line.replace("else", "} else {");
-            return line.replace("else", " else ");
+            return line.replace("else", "} else {");
+//            return line.replace("else", " else ");
         }
 
         return "";
     }
 
-    public static String doReturn(String line, boolean isIf) {
+    public static String doReturn(String line) {
+
+        // return 無返回值則標成注釋後返回
+        if ("return".equals(line.toLowerCase().trim())) return "// " + line;
 
         StringBuilder result = new StringBuilder();
         line = line.trim().split(" ")[1].trim();
@@ -98,23 +101,23 @@ public class KeywordMod {
         // 失敗
         if ("\"Fail\"".equalsIgnoreCase(line)) {
             result.append("\n// 失敗 \n");
-            result.append("return new TransactionData(false, \"\", FeeResultEnum.FE00_E0001, null, null);\n");
+            result.append("return new TransactionData(false, \"\", FeeResultEnum.FE00_E0001, null, null);");
         }
         // 封裝字串 return new TransactionData(true, "", ResultEnum.SUCCESS, new String(li_value4), null);
         else if (StrUtil.startWithIgnoreCase(line, "string")) {
             String param = StrUtil.unWrap(line, "string(", ")");
-            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new String(" + param + "), null);\n");
+            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new String(" + param + "), null);");
         }
         // 是數字
         else if (NumberUtil.isNumber(line)) {
             // 返回1則不處理
             //if (line.equals("1")) return "";
-            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);\n");
+            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);");
         }
         // 返回JSON則標注待處理
         else if (StrUtil.startWithIgnoreCase(line, "json")) {
             result.append("// TODO 處理返回值\n");
-            result.append("new TransactionData(true, \"\", ResultEnum.SUCCESS, 返回值, null);\n");
+            result.append("new TransactionData(true, \"\", ResultEnum.SUCCESS, 返回值, null);");
         }
         else {
             result.append("// " + line);
