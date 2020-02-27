@@ -120,6 +120,7 @@ public class IfMod {
             }
             // 比較字串是否相等 ls_close_flag != "A"
             else if (condiLeft.startsWith("ls_")){
+
                 if ("=".equals(logicOperator) || "==".equals(logicOperator)) {
                     return StrUtil.format("{}.equals({})", condiRight, condiLeft);
                 } else {
@@ -172,6 +173,20 @@ public class IfMod {
                         } else if ("-".equals(operator)) {
                             condiLeft = condiLeft + ".subtract(";
                         }
+                    }
+                }
+            }
+            // 處理參數 dw_criteria.tran_date_s
+            else if (condiLeft.contains(".")) {
+                String pojo = condiLeft.split("\\.")[0];
+                String prop = condiLeft.split("\\.")[1];
+                condiLeft = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+                // 字串比較
+                if (condiRight.contains("\"")) {
+                    if ("=".equals(logicOperator) || "==".equals(logicOperator)) {
+                        return StrUtil.format("{}.equals({})", condiRight, condiLeft);
+                    } else {
+                        return StrUtil.format("!{}.equals({})", condiRight, condiLeft);
                     }
                 }
             }

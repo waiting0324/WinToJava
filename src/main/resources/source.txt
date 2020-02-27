@@ -1,13 +1,17 @@
-update ar_trade 
-       set close_flag     = 'Y'
-     where cargo_location = :gs_uinfo.u_cargo_loca
-       and tran_date      = :ls_tran_date
-       and seq            = :ls_seq
-       and nvl(close_flag,'N') = 'N'
-          ;  
-    if sqlca.sqlcode <> 0 then 
-        rollback ;
-        
-        json.result_message 加入 messagebox('訊息','更新應收帳款收回資料之過帳狀態失敗 '+'SQLCODE:'+string(sqlca.sqlcode)+' '+SQLCA.SQLErrText)
-        return json
-    end if          
+if dw_detail.c_select' = 'Y' then
+		if ld_new_ttl_tax <> 0 or ld_new_ttl_pay_tax <> 0 then
+			ld_new_tax     = dw_detail.tax
+			ld_new_pay_tax = dw_detail.pay_tax
+			ld_new_tax     += ld_new_ttl_tax
+			ld_new_pay_tax += ld_new_ttl_pay_tax
+			dw_detail.tax = ld_new_tax
+			dw_detail.pay_tax = ld_new_pay_tax
+			Integer I = dw_detail.rowcount() + 1
+			
+			if dw_master.pay_by_cash = 'Y' then
+				ls_desc2 = dw_detail.description2'
+				if isnull(ls_desc2) then ls_desc2 = ''
+				if len(trim(ls_desc2)) = 0 then dw_detail.description2 ='申請現金方式支付倉租'
+			end if			
+		end if
+	end if

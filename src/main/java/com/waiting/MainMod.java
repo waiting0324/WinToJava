@@ -59,7 +59,7 @@ public class MainMod {
                 }
 
                 // 變量聲明
-                else if (StrUtil.startWithAny(trimLine, "string", "integer","int", "long", "datetime")) {
+                else if (StrUtil.startWithAny(trimLine, "string", "integer","int", "long", "datetime", "decimal")) {
                     line = DeclareMod.doVariDecl(line);
                 }
 
@@ -74,7 +74,7 @@ public class MainMod {
                 }
 
                 // 參數賦值
-                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "arg_")) {
+                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "ld_", "arg_")) {
                     line = AssignMod.doAsignParam(line);
                 }
 

@@ -1,7 +1,6 @@
 package com.waiting;
 
 import cn.hutool.core.util.StrUtil;
-import com.sun.tools.javac.Main;
 
 import java.io.*;
 

@@ -42,6 +42,8 @@ public class DeclareMod {
             line = doNum(line, "int");
         } else if (line.trim().startsWith("long")) {
             line = doNum(line, "long");
+        } else if (line.trim().startsWith("decimal")) {
+            line = doNum(line, "decimal");
         } else if (line.trim().startsWith("datetime")) {
             line = doDateTime(line);
         }

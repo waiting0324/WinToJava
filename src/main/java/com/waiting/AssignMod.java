@@ -117,6 +117,18 @@ public class AssignMod {
                 params = func.split("/");
             }
             StrUtil.trim(params);
+
+            // 處理POJO類 dw_error.cargo_location
+            for (int i = 0; i < params.length; i++) {
+                String param = params[i];
+                if (param.contains(".")) {
+                    List<String> split = StrUtil.splitTrim(param, ".");
+                    String pojo = split.get(0);
+                    String prop = split.get(1);
+                    params[i] = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
+                }
+            }
+
             func = StrUtil.format("{}.{}({})", params[0], operator, params[1]);
         }
         // 取MOD計算  mod(li_i,3) //除以3之餘數
