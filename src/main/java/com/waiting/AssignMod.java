@@ -14,6 +14,16 @@ public class AssignMod {
 
         String trimLine = line.trim();
 
+        // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y')
+        if (trimLine.contains("setitem")) {
+            String pojo = StrUtil.subBefore(trimLine, ".", false).trim();
+            String prop = StrUtil.subBetween(trimLine.split(",")[1], "\'", "\'")
+                    .replace("ls_", "").replace("li_", "")
+                    .replace("ll_", "").replace("ld_", "").trim();
+            String value = StrUtil.subAfter(trimLine, ",", true).replace(")", "");
+            trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);
+        }
+
         // 實體類
         String pojo = StrUtil.subBefore(trimLine, ".", false).trim();
         // 屬性
@@ -157,6 +167,10 @@ public class AssignMod {
             func = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
 
             if (isTrim)  func = StrUtil.format("StringUtils.trimToEmpty({})", func);
+        }
+        // getitemstring(row,"ls_mwb_no") Winform函數
+        else if (func.startsWith("getitemstring")) {
+            func = WinFormFunMod.getitemstring(line, true);
         }
 
 

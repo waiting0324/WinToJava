@@ -114,6 +114,11 @@ public class IfMod {
             String condiLeft = map.get("condiLeft");
             String condiRight = map.get("condiRight");
 
+            // Winform內置函數處理 dw_master情況
+            if (condiLeft.startsWith("getitemstring")) {
+                condiLeft = WinFormFunMod.getitemstring(condiLeft, false);
+            }
+
             // 字串長度處理 len(trim(ls_close_flag)) 可進行 + - * / 運算
             if (condiLeft.startsWith("len(")) {
                 condiLeft = tranIfLenTrimParas(condiLeft);
@@ -205,7 +210,7 @@ public class IfMod {
 
         // 替換關鍵字
         line = line.replace("and", "&&").replace(" or ", " || ")
-                .replace("\'", "\"").replace("<>", "!=");
+                .replace("\'", "\"").replace("<>", "!=").replace("If", "if");
 
         if (!StrUtil.containsAny(line, "then", "{")) {
             while (!StrUtil.containsAny(line += reader.readLine(), "then", "{")) ;

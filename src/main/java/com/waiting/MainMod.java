@@ -74,12 +74,12 @@ public class MainMod {
                 }
 
                 // 參數賦值
-                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "ld_", "arg_")) {
+                else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "ld_", "arg_", "ttl_")) {
                     line = AssignMod.doAsignParam(line);
                 }
 
                 // 條件語句
-                else if (trimLine.startsWith("if")) {
+                else if (StrUtil.startWithIgnoreCase(trimLine, "if")) {
                     line = IfMod.doIf(line, reader);
                 }
 
@@ -100,7 +100,8 @@ public class MainMod {
                     line = KeywordMod.doReturn(line);
                 }
                 // 關鍵字
-                else if (StrUtil.startWithAny(trimLine, "next", "end if", "loop", "commit", "open", "close", "continue", "else")) {
+                else if (StrUtil.startWithAny(trimLine.toLowerCase(), "next", "end if", "loop", "commit", "open", "close",
+                        "continue", "else", "Else", "rollback")) {
                     line = KeywordMod.doKeyword(line);
                 }
                 // 新增或更新SQL
@@ -122,6 +123,11 @@ public class MainMod {
                 // switch處理
                 else if (StrUtil.startWithAny(trimLine, "choose", "case", "end choose")) {
                     line = SwitchMod.doSwitch(line);
+                }
+
+                // Winform內置 dw_master情況
+                else if (trimLine.startsWith("setitem")) {
+                    line = KeywordMod.doSetitem(line);
                 }
 
                 // 加上換行
