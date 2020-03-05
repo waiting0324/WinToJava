@@ -96,6 +96,13 @@ public class IfMod {
                 param = StrUtil.subBefore(condi, "is", false).trim();
             }
 
+            // 處理Winform getitem函數 變成 屬性格式
+            // dw_detail.getitemstring(i,'overdue_flag') → dw_detail.overdue_flag
+            if (param.contains(".getitem")) {
+                param = param.replace("\"", "\'");
+                param = WinFormFunMod.doGetitemToPojoType(param);
+            }
+
             // 處理參數 dw_criteria.tran_date_s
             if (param.contains(".")) {
                 String pojo = param.split("\\.")[0];
@@ -117,6 +124,11 @@ public class IfMod {
             // Winform內置函數處理 dw_master情況
             if (condiLeft.startsWith("getitemstring")) {
                 condiLeft = WinFormFunMod.getitemstring(condiLeft, false);
+            }
+            // dw_detail.getitemstring(i,'overdue_flag')
+            else if (condiLeft.contains(".getitemstring")) {
+                condiLeft = condiLeft.replace("\"", "\'");
+                condiLeft = WinFormFunMod.doGetitemToPojoType(condiLeft);
             }
 
             // 字串長度處理 len(trim(ls_close_flag)) 可進行 + - * / 運算
@@ -240,6 +252,11 @@ public class IfMod {
         // 翻譯條件判斷式
         condi = trasIfCondition(condi);
 
+        // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
+        if (func.contains("setitem")) {
+            func = func.replace("\"", "\'");
+            func = WinFormFunMod.doSetitemToPojoType(func);
+        }
 
         // 處理func
         if (func.contains(".")) {

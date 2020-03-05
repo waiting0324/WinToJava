@@ -127,7 +127,7 @@ public class MainMod {
 
                 // Winform內置 dw_master情況
                 else if (trimLine.startsWith("setitem")) {
-                    line = KeywordMod.doSetitem(line);
+                    line = WinFormFunMod.doSetitem(line);
                 }
 
                 // 加上換行

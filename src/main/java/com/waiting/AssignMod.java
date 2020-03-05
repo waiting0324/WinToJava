@@ -14,14 +14,9 @@ public class AssignMod {
 
         String trimLine = line.trim();
 
-        // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y')
+        // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
         if (trimLine.contains("setitem")) {
-            String pojo = StrUtil.subBefore(trimLine, ".", false).trim();
-            String prop = StrUtil.subBetween(trimLine.split(",")[1], "\'", "\'")
-                    .replace("ls_", "").replace("li_", "")
-                    .replace("ll_", "").replace("ld_", "").trim();
-            String value = StrUtil.subAfter(trimLine, ",", true).replace(")", "");
-            trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);
+            trimLine = WinFormFunMod.doSetitemToPojoType(trimLine);
         }
 
         // 實體類
@@ -91,10 +86,19 @@ public class AssignMod {
     public static String doAsignParam(String line) {
 
         if (StrUtil.isBlank(line)) return "";
+        if (line.contains("return")) return line;
+
 
         String leftParam = line.split("=")[0].trim();
         String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
         String comment = StrUtil.subAfter(line, "//", true);
+
+        if (func.contains(".getitem")) {
+            func = func.replace("\'", "\"");
+            String pojo = func.split("\\.")[0];
+            String prop = StrUtil.subBetween(func, "\"", "\"");
+            func = StrUtil.format("{}.{}", pojo, prop);
+        }
 
         // 單純賦值為0  ll_non_rcv_cnt = 0
         if ("0".equals(func)) {

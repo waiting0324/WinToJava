@@ -132,16 +132,5 @@ public class KeywordMod {
         return result.toString();
     }
 
-    //  setitem(row,'ls_cust_attr',ls_cust_attribute) → dw_master.setCustAttr(ls_cust_attribute)
-    public static String doSetitem(String line) {
-        String trimLine = line.trim();
-        String prop = StrUtil.subBetween(trimLine.split(",")[1], "\'", "\'")
-                .replace("ls_", "").replace("li_", "")
-                .replace("ll_", "").replace("ld_", "").trim();
 
-        prop = StrUtil.toCamelCase(prop);
-        String value = StrUtil.subAfter(trimLine, ",", true).replace(")", "");
-
-        return StrUtil.format("dw_master.{}({});", StrUtil.genSetter(prop), value);
-    }
 }
