@@ -8,19 +8,31 @@ import cn.hutool.core.util.StrUtil;
  * @description 與變量聲明相關的
  */
 public class DeclareMod {
+
     // 函數聲明
     public static String doFuncDecl(String line) {
 
+        // 函數名聲
+        String funcName = "";
+        // 返回結果
+        String result = "";
 
         // 駝峰函數名
-        String funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, " ", "(").trim());
-        // 參數字串
-        String paramStr = StrUtil.subBetween(line, "(", ")");
-        // 參數關鍵字取代
-        paramStr = paramStr.replace("string", "String").replace("str", "String")
-                .replace("long", "BigDecimal").replace("decimal", "BigDecimal");
-
-        String result = StrUtil.format("@Override\npublic TransactionData {} ({}) {\n", funcName, paramStr);
+        // 此種函數聲明類型 event ue_update;
+        if (line.trim().startsWith("event")) {
+            funcName = StrUtil.toCamelCase(line.replace("event", "").split(";")[0].trim());
+            result = StrUtil.format("@Override\npublic TransactionData {}() {\n", funcName);
+        }
+        // 此種函數聲明類型 global function integer f_register_customer (string arg_cargo, string arg_register_no, string arg_err_show);
+        else {
+            funcName = StrUtil.toCamelCase(StrUtil.subBetween(line.replace("global function", ""), " ", "(").trim());
+            // 參數字串
+            String paramStr = StrUtil.subBetween(line, "(", ")");
+            // 參數關鍵字取代
+            paramStr = paramStr.replace("string", "String").replace("str", "String")
+                    .replace("long", "BigDecimal").replace("decimal", "BigDecimal");
+            result = StrUtil.format("@Override\npublic TransactionData {} ({}) {\n", funcName, paramStr);
+        }
 
         // 常用變量聲明
         result += "String sql;\n";

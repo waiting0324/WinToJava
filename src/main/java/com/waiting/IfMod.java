@@ -295,6 +295,14 @@ public class IfMod {
 
         source = source.trim();
 
+        // 處理運算符沒有用空格分開的情況
+        if (source.contains("+") && !source.contains(" + ")) {
+            source = source.replace("+", " + ");
+        }
+        if (source.contains("-") && !source.contains(" - ")) {
+            source = source.replace("-", " - ");
+        }
+
         String[] splits = source.split(" ");
         // 簡單類型，沒有運算符 len(trim(arg_bank_id))
         if (splits.length == 1) {

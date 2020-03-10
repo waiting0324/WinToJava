@@ -1,40 +1,24 @@
-SELECT IMP_GOODS_STORAGE.GCI_DATE,
-          IMP_GOODS_STORAGE.AIRLINE_ID,
-          IMP_GOODS_STORAGE.FLT_DATE,
-          IMP_GOODS_STORAGE.FLT_NO,
-          IMP_WORK_AREA.CHARGE_TYPE,
-			 SUM(IMP_GOODS_IN.ACT_PCS),
-          sum(pcs),
-          sum(wet),
-          sum(vol_wet)
-	  into :ls_gci_date, :ls_airline_id, :ls_flt_date,
-	  		 :ls_flt_no, :ls_charge_type, :ll_act_pcs, :ll_pcs, :ld_wet, :ld_vol_wet
-    FROM IMP_GOODS_STORAGE,
-			IMP_GOODS_IN,
-			IMP_WORK_AREA
-   WHERE IMP_GOODS_STORAGE.cargo_location =:gs_uinfo.u_cargo_loca
-	  and IMP_GOODS_STORAGE.mwb_no    =:ls_mwb_no
-	  and IMP_GOODS_STORAGE.mwb_no2   =:ls_mwb_no2
-	  and IMP_GOODS_STORAGE.hwb_no    =:ls_hwb_no
-	  and IMP_GOODS_STORAGE.PCS       > 0
-	  and IMP_GOODS_STORAGE.DATA_TYPE = 'T'
-	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_GOODS_IN.CARGO_LOCATION
-	  and IMP_GOODS_STORAGE.MWB_NO     = IMP_GOODS_IN.MWB_NO
-	  and IMP_GOODS_STORAGE.MWB_NO2    = IMP_GOODS_IN.MWB_NO2
-	  and IMP_GOODS_STORAGE.HWB_NO     = IMP_GOODS_IN.HWB_NO
-	  and IMP_GOODS_STORAGE.GCI_DATE   = IMP_GOODS_IN.GCI_DATE
-	  and IMP_GOODS_STORAGE.AIRLINE_ID = IMP_GOODS_IN.AIRLINE_ID
-	  and IMP_GOODS_STORAGE.FLT_NO     = IMP_GOODS_IN.FLT_NO
-	  and IMP_GOODS_STORAGE.FLT_DATE   = IMP_GOODS_IN.FLT_DATE
-	  and IMP_GOODS_IN.ACT_PCS > 0
-	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_WORK_AREA.CARGO_LOCATION (+)
-     and IMP_GOODS_STORAGE.DATA_TYPE      = IMP_WORK_AREA.DATA_TYPE (+)
-     and IMP_GOODS_STORAGE.LOCATION       = IMP_WORK_AREA.LOCATION (+)
-	  and	ROWNUM = 1
-GROUP BY IMP_GOODS_STORAGE.GCI_DATE,
-         IMP_GOODS_STORAGE.AIRLINE_ID,
-         IMP_GOODS_STORAGE.FLT_DATE,
-         IMP_GOODS_STORAGE.FLT_NO,
-         IMP_GOODS_STORAGE.FLT_TIME,
-         IMP_WORK_AREA.CHARGE_TYPE
-         ;
+	messagebox('訊息','請輸入完整主號')
+	return
+end if
+if len(trim(ls_box_id)) = 0 then 
+	if ls_other_type = 'D' or ls_charge_sel = '1' then	
+		messagebox('訊息','請輸入承攬業~或航空公司代號')
+		return
+	end if
+end if
+if len(trim(ls_mwb_no)) = 0 or len(trim(ls_mwb_no2)) = 0 then
+	messagebox('訊息','未輸入主號資料')
+	return 	
+end if
+if len(trim(ls_comp_id)) > 0 and f_chk_idno(ls_comp_id) <> 0 then
+	messagebox('訊息','統一編號檢核錯誤~')
+	return 
+end if
+if ls_cust_attribute = 'A' then //and (ls_charge_sel = '1' or ls_other_type = 'D')
+	if not wf_check_agent(ls_cus_box_no,ls_pay_type,f_get_fdate(),ls_box_id) then 
+		messagebox('存檔失敗','當期向航空公司收取空轉空費用之承攬業~代號需一致')					
+		triggerevent('ue_clear')
+		return
+	end if
+end if

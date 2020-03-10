@@ -14,6 +14,10 @@ public class AssignMod {
 
         String trimLine = line.trim();
 
+        if (trimLine.split("\\.")[1] != null && trimLine.split("\\.")[1].startsWith("accepttext")) {
+            return "// " + trimLine;
+        }
+
         // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
         if (trimLine.contains("setitem")) {
             trimLine = WinFormFunMod.doSetitemToPojoType(trimLine);
@@ -100,7 +104,8 @@ public class AssignMod {
         if (func.contains(".getitem")) {
             func = func.replace("\'", "\"");
             String pojo = func.split("\\.")[0];
-            String prop = StrUtil.subBetween(func, "\"", "\"");
+            String prop = StrUtil.subBetween(func, "\"", "\"").replace("ls_", "").replace("li_", "")
+                    .replace("ll_", "").replace("ld_", "").trim();;
             func = StrUtil.format("{}.{}", pojo, prop);
         }
 

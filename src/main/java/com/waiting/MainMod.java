@@ -90,9 +90,8 @@ public class MainMod {
                 }
 
                 // 函數聲明
-                else if (StrUtil.startWithAny(trimLine, "Str")
-                        || StrUtil.startWithIgnoreCase(trimLine, "json")
-                ) {
+                else if (StrUtil.startWithAny(trimLine, "event")
+                        || StrUtil.startWithIgnoreCase(trimLine, "global function")) {
                     line = DeclareMod.doFuncDecl(line);
                 }
                 // 返回
@@ -111,7 +110,7 @@ public class MainMod {
                     line = SqlMod.doUpdate(line, reader);
                 }
                 // 處理for跟do while
-                else if (StrUtil.startWithAny(trimLine, "for", "do while")) {
+                else if (StrUtil.startWithAny(trimLine, "do while")) {
                     line = line + " {";
                 }
 
@@ -128,6 +127,10 @@ public class MainMod {
                 // Winform內置 dw_master情況
                 else if (trimLine.startsWith("setitem")) {
                     line = WinFormFunMod.doSetitem(line);
+                }
+
+                else if (trimLine.startsWith("for")) {
+                    line = ForMod.doFor(line);
                 }
 
                 // 加上換行

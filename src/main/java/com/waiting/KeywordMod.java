@@ -35,7 +35,7 @@ public class KeywordMod {
         // '訊息','客服組已輸入【客戶:'+ls_register_no+'】使用額度沖銷資料，系統不再自動寫入'
         String paramStr = StrUtil.unWrap(line, "messagebox(", ")");
         // 判斷訊息狀態
-        if (paramStr.split(",")[0].contains("訊息")) resultType = "true";
+        //if (paramStr.split(",")[0].contains("訊息")) resultType = "true";
 
         // 取得訊息中的變量
         String msg = "";
