@@ -1,33 +1,40 @@
-//雜項費用
-	if ls_storage_mark = '2' then //and ( len(trim(ls_mwb_no)) > 0 or len(trim(ls_mwb_no2)) > 0) then
-		ls_airline_id = 'XXX'
-		ld_tax_rate   = dw_master.getitemdecimal(dw_master.getrow(),'ld_tax_rate')
-		ls_cus_box_no = dw_master.getitemstring(dw_master.getrow(),'ls_box_id')	
-		//if dw_detail.rowcount() = 0 then
-		//dw_detail.insertrow(0)
-		dw_master.setitem(dw_master.getrow(),'ls_force','N')
-		dw_master.setitem(dw_master.getrow(),'ls_man_release','N')
-		dw_detail.setitem(1, 'cargo_location', gs_uinfo.u_cargo_loca)		
-		dw_detail.setitem(1, 'c_select', 'Y')
-		dw_detail.setitem(1, 'mwb_no', ls_mwb_no)
-		dw_detail.setitem(1, 'mwb_no2', ls_mwb_no2)
-		dw_detail.setitem(1, 'hwb_no', ls_hwb_no)
-		dw_detail.setitem(1, 'work_type', 'T')
-		dw_detail.setitem(1, 'inc_id', ls_comp_id)
-		dw_detail.setitem(1, 'custom_id', ls_account_no)
-		dw_detail.setitem(1, 'agent_code', ls_cus_box_no)
-		dw_detail.setitem(1, 'force_flag', 'N')
-		dw_detail.setitem(1, 'manual_flag', 'N')
-		dw_detail.setitem(1, 'payment_type', ls_pay_type)
-		dw_detail.setitem(1, 'charge_type', ls_other_type)
-		dw_detail.setitem(1, 'storage_mark', 'N')		
-		dw_detail.setitem(1, 'overdue_flag', 'N')
-		dw_detail.setitem(1, 'pcs', ld_times)
-		if ls_class = 'BD' then
-			dw_detail.setitem(1, 'special_flag', 'M') //貨改郵
-		elseif ls_class = 'BC' then
-			dw_detail.setitem(1, 'special_flag', 'C') //郵改貨
-		else
-			dw_detail.setitem(1, 'special_flag', 'A')
-		end if
-   	dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)
+SELECT IMP_GOODS_STORAGE.GCI_DATE,
+          IMP_GOODS_STORAGE.AIRLINE_ID,
+          IMP_GOODS_STORAGE.FLT_DATE,
+          IMP_GOODS_STORAGE.FLT_NO,
+          IMP_WORK_AREA.CHARGE_TYPE,
+			 SUM(IMP_GOODS_IN.ACT_PCS),
+          sum(pcs),
+          sum(wet),
+          sum(vol_wet)
+	  into :ls_gci_date, :ls_airline_id, :ls_flt_date,
+	  		 :ls_flt_no, :ls_charge_type, :ll_act_pcs, :ll_pcs, :ld_wet, :ld_vol_wet
+    FROM IMP_GOODS_STORAGE,
+			IMP_GOODS_IN,
+			IMP_WORK_AREA
+   WHERE IMP_GOODS_STORAGE.cargo_location =:gs_uinfo.u_cargo_loca
+	  and IMP_GOODS_STORAGE.mwb_no    =:ls_mwb_no
+	  and IMP_GOODS_STORAGE.mwb_no2   =:ls_mwb_no2
+	  and IMP_GOODS_STORAGE.hwb_no    =:ls_hwb_no
+	  and IMP_GOODS_STORAGE.PCS       > 0
+	  and IMP_GOODS_STORAGE.DATA_TYPE = 'T'
+	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_GOODS_IN.CARGO_LOCATION
+	  and IMP_GOODS_STORAGE.MWB_NO     = IMP_GOODS_IN.MWB_NO
+	  and IMP_GOODS_STORAGE.MWB_NO2    = IMP_GOODS_IN.MWB_NO2
+	  and IMP_GOODS_STORAGE.HWB_NO     = IMP_GOODS_IN.HWB_NO
+	  and IMP_GOODS_STORAGE.GCI_DATE   = IMP_GOODS_IN.GCI_DATE
+	  and IMP_GOODS_STORAGE.AIRLINE_ID = IMP_GOODS_IN.AIRLINE_ID
+	  and IMP_GOODS_STORAGE.FLT_NO     = IMP_GOODS_IN.FLT_NO
+	  and IMP_GOODS_STORAGE.FLT_DATE   = IMP_GOODS_IN.FLT_DATE
+	  and IMP_GOODS_IN.ACT_PCS > 0
+	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_WORK_AREA.CARGO_LOCATION (+)
+     and IMP_GOODS_STORAGE.DATA_TYPE      = IMP_WORK_AREA.DATA_TYPE (+)
+     and IMP_GOODS_STORAGE.LOCATION       = IMP_WORK_AREA.LOCATION (+)
+	  and	ROWNUM = 1
+GROUP BY IMP_GOODS_STORAGE.GCI_DATE,
+         IMP_GOODS_STORAGE.AIRLINE_ID,
+         IMP_GOODS_STORAGE.FLT_DATE,
+         IMP_GOODS_STORAGE.FLT_NO,
+         IMP_GOODS_STORAGE.FLT_TIME,
+         IMP_WORK_AREA.CHARGE_TYPE
+         ;

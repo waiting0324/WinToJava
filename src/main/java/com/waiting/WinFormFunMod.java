@@ -12,6 +12,7 @@ public class WinFormFunMod {
     // getitemstring(row,"ls_mwb_no") → dw_master.getMwbNo();
     // isAssignPatten: 是否為賦值情況
     public static String getitemstring(String line, boolean isAssignPatten) {
+        line = line.replace("\"", "\'");
         String prop = StrUtil.subAfter(StrUtil.subBetween(line, "\'", "\'"), "_", false);
         if (isAssignPatten) {
             prop = StrUtil.toCamelCase(prop);

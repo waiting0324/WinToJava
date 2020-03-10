@@ -69,7 +69,7 @@ public class MainMod {
                 }
 
                 // 特殊運算符
-                else if (StrUtil.containsAny(trimLine, "+=", "++", "-=")) {
+                else if (StrUtil.containsAny(trimLine, "+=", "++", "-=", "--")) {
                     line = AssignMod.doSpecialOperator(line);
                 }
 
@@ -148,6 +148,8 @@ public class MainMod {
         System.out.println("===============================");
         System.out.println(result);
 
+
+        System.out.println(Thread.currentThread().getStackTrace()[1].getLineNumber());
 
         writer.close();
 

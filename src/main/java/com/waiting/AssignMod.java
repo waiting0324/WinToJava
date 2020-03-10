@@ -66,7 +66,11 @@ public class AssignMod {
 
         if (line.contains("++")) {
             String param = StrUtil.subBefore(line, "++", true).trim();
-            line = StrUtil.indexedFormat("{0} = {0}.add({0})", param);
+            line = StrUtil.indexedFormat("{0} = {0}.add(BigDecimal.ONE)", param);
+        }
+        else if (line.contains("--")) {
+            String param = StrUtil.subBefore(line, "--", true).trim();
+            line = StrUtil.indexedFormat("{0} = {0}.subtract(BigDecimal.ONE)", param);
         }
         else if (line.contains("+=")) {
             String leftParam = line.split("\\+=")[0].trim();

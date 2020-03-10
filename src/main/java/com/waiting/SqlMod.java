@@ -330,8 +330,8 @@ public class SqlMod {
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
         table = "resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n";
-        table += "resultMap = new HashMap();\n";
-        table += "if (resultList.size() != 0)  resultMap = (Map<String, Object>) resultList.get(0);\n";
+        table += "if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n";
+        table += "resultMap = (Map<String, Object>) resultList.get(0);\n";
         result += table;
 
         // 查詢結果封裝 ls_temp = resultMap.get("LS_TEMP");
