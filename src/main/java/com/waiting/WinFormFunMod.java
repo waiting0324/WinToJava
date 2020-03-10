@@ -63,4 +63,13 @@ public class WinFormFunMod {
 
         return StrUtil.format("dw_master.{}({});", StrUtil.genSetter(prop), value);
     }
+
+    public static String doTriggerevent(String line) {
+
+        String funcName = StrUtil.subBetween(line, "(", ")");
+        funcName = StrUtil.unWrap(funcName, "\'", "\'");
+        funcName = StrUtil.unWrap(funcName, "\"", "\"");
+
+        return StrUtil.format("{}();", StrUtil.toCamelCase(funcName));
+    }
 }

@@ -128,7 +128,11 @@ public class MainMod {
                 else if (trimLine.startsWith("setitem")) {
                     line = WinFormFunMod.doSetitem(line);
                 }
-
+                // Winform的triggerevent函數
+                else if (trimLine.startsWith("triggerevent")) {
+                    line = WinFormFunMod.doTriggerevent(line);
+                }
+                // For循環處理
                 else if (trimLine.startsWith("for")) {
                     line = ForMod.doFor(line);
                 }

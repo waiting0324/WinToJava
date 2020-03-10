@@ -39,11 +39,9 @@ public class IfMod {
         } else if (condi.contains("<")) {
             logicOpeartor = "<";
         }
-        // 特殊異常情況處理
+        // 沒有運算符則不處理
         else {
-            logicOpeartor = "??";
-            condiLeft = StrUtil.splitTrim(condi, logicOpeartor).get(0);
-            condi = condiLeft + " ?? " + condiLeft;
+            return (Map) new HashMap<>();
         }
 
 
@@ -121,6 +119,15 @@ public class IfMod {
             String condiLeft = map.get("condiLeft");
             String condiRight = map.get("condiRight");
 
+            // 沒有運算符情況處理
+            if (logicOperator == null) {
+                // 如果有函數則改為駝峰命名法
+                if (condi.contains("(")) {
+                    String funcName = StrUtil.subBefore(condi, "(", false);
+                    condi = condi.replace(funcName, StrUtil.toCamelCase(funcName));
+                }
+                return condi;
+            }
             // Winform內置函數處理 dw_master情況
             if (condiLeft.startsWith("getitemstring")) {
                 condiLeft = WinFormFunMod.getitemstring(condiLeft, false);
@@ -222,7 +229,8 @@ public class IfMod {
 
         // 替換關鍵字
         line = line.replace("and", "&&").replace(" or ", " || ")
-                .replace("\'", "\"").replace("<>", "!=").replace("If", "if");
+                .replace("\'", "\"").replace("<>", "!=")
+                .replace("If", "if").replace("not ", "!");
 
         if (!StrUtil.containsAny(line, "then", "{")) {
             while (!StrUtil.containsAny(line += reader.readLine(), "then", "{")) ;

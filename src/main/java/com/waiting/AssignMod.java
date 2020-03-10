@@ -14,8 +14,13 @@ public class AssignMod {
 
         String trimLine = line.trim();
 
+        // Winform的accepttext()函數
         if (trimLine.split("\\.")[1] != null && trimLine.split("\\.")[1].startsWith("accepttext")) {
             return "// " + trimLine;
+        }
+        // Winform的triggerevent()函數
+        if (trimLine.contains("triggerevent")) {
+            return WinFormFunMod.doTriggerevent(trimLine);
         }
 
         // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
