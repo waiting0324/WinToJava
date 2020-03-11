@@ -328,6 +328,8 @@ public class SqlMod {
         // :參數
         Set<String> params = getSqlParams(oriSql);
 
+        StringBuilder result = new StringBuilder();
+
 
         // 產生JPA查詢表的API
         if (selecColumns.size() > 5 && tables.length == 1) {
@@ -339,35 +341,33 @@ public class SqlMod {
         oriSql = addSelectColumnAlias(oriSql, selecColumns, isIntoTypeSql);
 
         // :參數增加空格
-        String result = oriSql.toString().replace("(:", "( :").replace("=:", "= :");
-        ;
+        oriSql = oriSql.replace("(:", "( :").replace("=:", "= :");
 
 
         // 去除尾部 +號 並增加 ；號
-        result = "sql = " + StrUtil.subBefore(result, " + ", true) + ";\n";
+        result.append("sql = " + StrUtil.subBefore(oriSql, " + ", true) + ";\n");
 
         // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
         if (params.size() != 0) {
-            result += "param = new HashMap(); \n";
+            result.append("param = new HashMap(); \n");
             for (String param : params) {
                 // gs_uinfo.u_cargo_loca 做特殊處理
                 if ("gs_uinfo.u_cargo_loca".equals(param)) {
-                    result = result + "param.put(\"" + param + "\", u_cargo_loca);\n";
+                    result.append("param.put(\"" + param + "\", u_cargo_loca);\n");
                 } else {
-                    result = result + "param.put(\"" + param + "\", " + param + ");\n";
+                    result.append("param.put(\"" + param + "\", " + param + ");\n");
                 }
             }
         }
 
-        result += "\n";
+        result.append("\n");
 
         // 增加持久層查詢語句  resMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
-        table = "resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n";
-        table += "if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n";
-        table += "resultMap = (Map<String, Object>) resultList.get(0);\n";
-        result += table;
+        result.append("resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n");
+        result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
+        result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");
 
         // 查詢結果封裝 ls_temp = resultMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
@@ -375,18 +375,18 @@ public class SqlMod {
             if (isIntoTypeSql) {
                 // 數字類型
                 if (StrUtil.containsAnyIgnoreCase(selecColumn, "ll", "li", "ld")) {
-                    result = result + selecColumn.toLowerCase() + " = (BigDecimal) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                    result.append(selecColumn.toLowerCase() + " = (BigDecimal) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n");
                 }
                 // 非數字類型
                 else {
-                    result = result + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                    result.append(selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n");
                 }
             } else {
-                result = result + "ls_" + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n";
+                result.append("ls_" + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n");
             }
         }
 
-        return result;
+        return result.toString();
     }
 
     // 處理非查詢的SQL語句

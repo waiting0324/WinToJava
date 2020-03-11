@@ -1,4 +1,5 @@
-public function integer wf_charge_sp (string invoice_no);string  ls_fee_date, ls_inc_id, ls_mwb_no, ls_mwb_no2, ls_hwb_no, ls_work_type, ls_charge_type
+public function integer wf_charge_sp (string invoice_no);
+string  ls_fee_date, ls_inc_id, ls_mwb_no, ls_mwb_no2, ls_hwb_no, ls_work_type, ls_charge_type
 string  ls_start_date, ls_end_date, ls_full_name, ls_address, ls_cargo_location, ls_inv_tax_adjust
 string  ls_charge_desc, ls_work_name, nt_dollar, nt_dollar_temp, ls_check_num
 string  ls_upd_user, ls_payment_type, ls_apply_no, ls_gate_no, ls_custom_id
