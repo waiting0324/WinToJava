@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -132,6 +133,10 @@ public class MainMod {
                 else if (trimLine.startsWith("triggerevent")) {
                     line = WinFormFunMod.doTriggerevent(line);
                 }
+                // Winform的end event
+                else if (trimLine.startsWith("end event")) {
+                    line = WinFormFunMod.doEndEvent(line);
+                }
                 // For循環處理
                 else if (trimLine.startsWith("for")) {
                     line = ForMod.doFor(line);
@@ -156,9 +161,6 @@ public class MainMod {
         System.out.println(result);
 
 
-        System.out.println(Thread.currentThread().getStackTrace()[1].getLineNumber());
-
         writer.close();
-
     }
 }

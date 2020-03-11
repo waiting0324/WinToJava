@@ -1,193 +1,77 @@
-event ue_update;
-integer li_row, li_i, li_do_row = 0 //, li_print_row
-integer li_charge_days, li_storage_days
-long    ll_ar_amount = 0, ll_over_amount
-string  ls_mwb_no,ls_mwb_no2, ls_prefer_flag, ls_return_type, ls_charge_sel
-string  ls_start_date, ls_end_date, ls_cus_box_no, ls_fee_target, ls_charge_type, ls_airline_id, ls_flt_no
-string  ls_comp_id, ls_flt_date, ls_gci_date, ls_gco_date, ls_box_id, ls_today
-string  ls_hwb_no, ls_overamt_on, ls_pay_type, ls_other_type, ls_cust_attribute
-string  ls_einv_device, ls_carrierid
-
-ii_itmchg=1
-
-dw_master.accepttext()
-dw_detail.accepttext()
-ls_fee_target  = dw_master.getitemstring(dw_master.getrow(),'ls_fee_target')
-ls_comp_id     = dw_master.getitemstring(dw_master.getrow(),'ls_comp_id')
-ls_cus_box_no  = dw_master.getitemstring(dw_master.getrow(),'ls_account_no')
-ls_gco_date    = dw_master.getitemstring(dw_master.getrow(),'ls_gco_date')
-ls_charge_sel  = dw_master.getitemstring(dw_master.getrow(),'ls_charge_type')
-ls_box_id      = dw_master.getitemstring(dw_master.getrow(),'ls_box_id')
-ls_mwb_no      = dw_master.getitemstring(dw_master.getrow(),'ls_mwb_no')
-ls_mwb_no2     = dw_master.getitemstring(dw_master.getrow(),'ls_mwb_no2')
-ls_pay_type    = dw_master.getitemstring(dw_master.getrow(),'ls_pay_type')
-ls_other_type  = dw_master.getitemstring(dw_master.getrow(),'ls_other_type')
-ls_einv_device = dw_master.getitemstring(dw_master.getrow(),'ls_einv_device') //電子發票載具類別代碼
-ls_carrierid   = dw_master.getitemstring(dw_master.getrow(),'ls_carrierid')   //電子發票載具顯碼
-
-if isnull(ls_fee_target)  then ls_fee_target  = ''
-if isnull(ls_comp_id)     then ls_comp_id     = ''
-if isnull(ls_cus_box_no)  then ls_cus_box_no  = ''
-if isnull(ls_box_id)      then ls_box_id      = ''
-if isnull(ls_mwb_no)      then ls_mwb_no      = ''
-if isnull(ls_mwb_no2)     then ls_mwb_no2     = ''
-if isnull(ls_other_type)  then ls_other_type  = ''
-if isnull(ls_einv_device) then ls_einv_device = 'N' 
-if isnull(ls_carrierid)   then ls_carrierid   = ''
-ls_today = f_get_fdate()
-
-select cust_attribute
-  into :ls_cust_attribute
-  from registered_customer
- where cargo_location =:gs_uinfo.u_cargo_loca
-	and register_no    =:ls_cus_box_no
-	and effect_date   <=:ls_today
-	and cancel_date   >=:ls_today ;
-if isnull(ls_cust_attribute) then ls_cust_attribute = ''
-if ls_cust_attribute = 'A' then
-	if ls_charge_sel = '1' or ls_other_type = 'D' then //原改標手續費 不可記帳至航空公司 自2009/09/01開始可以入帳至航空公司
-	else
-		for li_i = 1 to dw_detail.rowcount()
-			if dw_detail.getitemstring(li_i,'storage_mark') = 'Y' then
-			else
-				if ls_other_type = 'I' or ls_other_type = 'J' then	dw_detail.setitem(li_i,'special_flag','')
-			end if
-		next
-	end if
-end if
-if len(trim(ls_mwb_no))+len(trim(ls_mwb_no2)) > 0 and ls_mwb_no <> 'DN' and len(trim(ls_mwb_no))+len(trim(ls_mwb_no2)) < 11 then
-	messagebox('訊息','請輸入完整主號')
-	return
-end if
-if len(trim(ls_box_id)) = 0 then 
-	if ls_other_type = 'D' or ls_charge_sel = '1' then	
-		messagebox('訊息','請輸入承攬業~或航空公司代號')
-		return
-	end if
-end if
-if len(trim(ls_mwb_no)) = 0 or len(trim(ls_mwb_no2)) = 0 then
-	messagebox('訊息','未輸入主號資料')
-	return 	
-end if
-if len(trim(ls_comp_id)) > 0 and f_chk_idno(ls_comp_id) <> 0 then
-	messagebox('訊息','統一編號檢核錯誤~')
-	return 
-end if
-if ls_cust_attribute = 'A' then //and (ls_charge_sel = '1' or ls_other_type = 'D')
-	if not wf_check_agent(ls_cus_box_no,ls_pay_type,f_get_fdate(),ls_box_id) then 
-		messagebox('存檔失敗','當期向航空公司收取空轉空費用之承攬業~代號需一致')					
-		triggerevent('ue_clear')
-		return
-	end if
-end if
-ls_overamt_on = 'N'
-for li_i = 1 to dw_detail.rowcount()
-	if dw_detail.getitemstring(li_i,'c_select') = 'Y' and &
-	   (isnull(dw_detail.getitemnumber(li_i,'ar_amount')) or &
-		 dw_detail.getitemnumber(li_i,'ar_amount') = 0 ) &
-		and dw_detail.getitemstring(li_i,'overdue_flag') = 'N' then  
-		messagebox('訊息','請先執行試算倉租功能')
-		cb_calc.triggerevent('clicked')
-		return
-	end if	
-	
-	if dw_detail.getitemstring(li_i,'c_select') = 'Y' then 
-		if isnull(dw_detail.getitemstring(li_i,'agent_code')) then 
-	   	if ls_other_type = 'D' or ls_charge_sel = '1' then	//倉租收入 or 改標手續費 承攬業代號不可空白
-				messagebox('訊息','請輸入承攬業~或航空公司代號')
-				return
-			end if
-		end if
-		if (not isnull(dw_detail.getitemstring(li_i,'charge_type')) and dw_detail.getitemstring(li_i,'charge_type') <> '') &
-		   or dw_detail.getitemdecimal(li_i,'wet') > 0 or dw_detail.getitemdecimal(li_i,'vol_wet') > 0 then 
-			li_do_row ++
-		end if		
-		ll_ar_amount += dw_detail.getitemnumber(li_i,'ar_amount')
-		if isnull(dw_detail.getitemnumber(li_i,'over_amount')) or dw_detail.getitemnumber(li_i,'over_amount') = 0 then
-		else
-			ll_over_amount += dw_detail.getitemnumber(li_i,'over_amount')
-		end if
-		ls_prefer_flag  = dw_detail.getitemstring(li_i,'prefer_flag')
-		ls_return_type  = dw_detail.getitemstring(li_i,'return_type')
-		ls_charge_type  = dw_detail.getitemstring(li_i,'charge_type')
-		ls_gci_date     = dw_detail.getitemstring(li_i,'gci_date')
-		ls_start_date   = dw_detail.getitemstring(li_i,'start_date')
-		ls_end_date     = dw_detail.getitemstring(li_i,'end_date')
-		ls_airline_id   = dw_detail.getitemstring(li_i,'airline_id')
-		ls_flt_no       = dw_detail.getitemstring(li_i,'flt_no')
-		ls_flt_date     = dw_detail.getitemstring(li_i,'flt_date')
-		ls_mwb_no       = dw_detail.getitemstring(li_i,'mwb_no')
-		if isnull(ls_prefer_flag) then ls_prefer_flag = ''
-		if isnull(ls_return_type) then ls_return_type = ''
-
-		if ll_over_amount <> 0 then
-			if len(trim(ls_return_type)) = 0 or len(trim(ls_prefer_flag)) = 0 then
-			else
-				ls_overamt_on = 'Y'
-			end if
-		end if	
-	end if
-next
-
-//if gs_uinfo.u_id = 'eds' or gs_uinfo.u_id = 'edsk' or &
-//  (gs_uinfo.u_cargo_loca = 'C' and f_get_fdate() > '20111015') or &
-//  (gs_uinfo.u_cargo_loca = 'K' and f_get_fdate() > '20111231') then 
-//	li_print_row = 4
-//else
-//	li_print_row = 8
-//end if
-
-if li_do_row = 0 then 
-	messagebox('錯誤~','請先點選收費欄位為[是]')
-	return 
-end if
-
-if ls_einv_device <> 'N'  and len(trim(ls_carrierid)) = 0 then
-	messagebox('訊息','請輸入個人電子發票載具代碼')
-	return	
-end if
-
-if li_do_row > ii_inv_rec then
-	if ls_pay_type = 'C' or ls_pay_type = 'N' or ls_pay_type = 'K' or ls_pay_type = 'L' then
-		messagebox('訊息','請注意此票貨物計費資料已超過'+string(ii_inv_rec)+'筆，'+char(13)+char(10)+'若要開立發票，超過筆數部分請先勾選不收費，於下次計費')
-		return
-	end if
-end if
-if isnull(dw_master.getitemstring(dw_master.getrow(),'ls_comp_id')) and dw_master.getitemstring(dw_master.getrow(),'ls_inv_type') = '31' then
-	if messagebox('訊息','發票統編資料為空白,確定存檔?',Question!,YesNo!,2) = 2 then
-		return 
-	end if
-end if
-if ll_ar_amount <= 0 then
-	if ll_ar_amount < 0 and (ls_pay_type = 'C' or ls_pay_type = 'N' or ls_pay_type = 'K' or ls_pay_type = 'L') then
-		messagebox('訊息','發票金額合計不可小於零') 
-		return
-	else
-		if messagebox('訊息','應收費金額合計小等於零,確定存檔？',Question!,YesNo!,2) = 2 then return
-	end if
-end if
-ii_itmchg=2
-dw_detail.triggerevent("ue_update")
-
-if ib_ok then
-	ls_mwb_no  = dw_master.getitemstring(dw_master.getrow(),'ls_mwb_no')
-	ls_mwb_no2 = dw_master.getitemstring(dw_master.getrow(),'ls_mwb_no2')
-	ls_hwb_no  = dw_master.getitemstring(dw_master.getrow(),'ls_hwb_no')
-	if isnull(ls_hwb_no) then ls_hwb_no = ''
-	if len(trim(ls_hwb_no)) = 0 then ls_hwb_no = ' '		
-	
-	dw_master.reset()
-   dw_master.triggerevent("ue_insert")
-	dw_master.setitem(dw_master.getrow(),'ls_force','N')
-	dw_master.setitem(dw_master.getrow(),'ls_mwb_no',ls_mwb_no)
-	dw_master.setitem(dw_master.getrow(),'ls_mwb_no2',ls_mwb_no2)
-	dw_detail.reset()
-	dw_detail.object.ar_amount.protect = true
-	dw_detail.object.pay_amount.protect = true
-	dw_detail.object.gci_date.protect = true
-	dw_detail.object.start_date.protect = true
-	dw_detail.object.end_date.protect = true
-	dw_detail.object.pcs.protect = true	
-end if
-return
-end event
+select charge_sp.cargo_location, 
+       charge_sp.work_type, 
+		 charge_sp.charge_type,
+		 to_char(to_date(charge_sp.start_date,'yyyy/mm/dd'),'yyyy/mm/dd'), 
+		 to_char(to_date(charge_sp.end_date,'yyyy/mm/dd'),'yyyy/mm/dd'), 
+		 charge_sp.vol_wet, 
+		 charge_sp.wet, 
+		 (charge_sp.ar_amount - nvl(charge_sp.db_amt,0)), 
+		 decode(nvl(charge_sp.over_amount,0),0,0,nvl(charge_sp.over_amount,0) + (nvl(charge_sp.tax,0) - nvl(charge_sp.pay_tax,0))),
+		 charge_sp.pay_amount,
+		 charge_sp.tax, 
+		 charge_sp.pay_tax,
+		 charge_sp.prev_invoice_no,
+		 charge_sp.storage_mark,
+		 charge_sp.fee_date,
+		 app05.app05_user_name,
+		 charge_sp.fee_date, 
+		 charge_sp.mwb_no,
+		 charge_sp.mwb_no2, 
+		 charge_sp.hwb_no, 
+		 charge_sp.payment_type, 
+		 charge_sp.apply_no,
+		 charge_sp.gci_date, 
+		 charge_sp.airline_id, 
+		 charge_sp.flt_no, 
+		 charge_sp.flt_date, 
+		 charge_sp.agent_code,
+		 charge_sp.custom_id, 
+		 charge_sp.return_type,
+		 charge_sp.upd_user,
+		 nvl(registered_customer.inv_tax_adjust,'N') inv_tax_adjust,
+		 nvl(charge_sp.over_amount,0),
+		 decode(invoice_master.device_id,null,'Y','N') print_invoice
+		 INTO :ls_cargo_location,
+         			:ls_work_type,
+         			:ls_charge_type,
+         			:ls_start_date,
+         			:ls_end_date,
+         			:ld_vol_wet,
+         			:ld_wet,
+         			:ll_ar_amount,
+         			:ll_over_amount,
+         			:ll_pay_amount,
+         			:ll_tax,
+         			:ll_pay_tax,
+         			:ls_prev_no,
+         			:ls_storage_mark,
+         			:ls_fee_date,
+         			:ls_user_name,
+         			:ls_fee_date,
+         			:ls_mwb_no,
+         			:ls_mwb_no2,
+         			:ls_hwb_no,
+         			:ls_payment_type,
+         			:ls_apply_no,
+         			:ls_gci_date,
+         			:ls_airline_id,
+         			:ls_flt_no,
+         			:ls_flt_date,
+         			:ls_agent_code,
+         			:ls_custom_id,
+         			:ls_return_type,
+         			:ls_upd_user,
+         			:ls_inv_tax_adjust,
+         			:ll_over_amt_without_tax,
+         			:ls_print_invoice
+  from charge_sp, 
+       invoice_master,
+       app05,
+		 registered_customer
+ where charge_sp.invoice_no     = :invoice_no
+	and charge_sp.invoice_no     = invoice_master.invoice_no
+	and charge_sp.cargo_location = invoice_master.cargo_location
+   and charge_sp.upd_user       = app05.app05_user_id 
+	and charge_sp.cargo_location = registered_customer.cargo_location (+)
+	and charge_sp.custom_id      = registered_customer.register_no    (+)
+	  ;

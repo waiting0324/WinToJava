@@ -19,8 +19,16 @@ public class AssignMod {
             return "// " + trimLine;
         }
         // Winform的triggerevent()函數
-        if (trimLine.contains("triggerevent")) {
+        else if (trimLine.contains("triggerevent")) {
             return WinFormFunMod.doTriggerevent(trimLine);
+        }
+        // Winform的reset()函數
+        else if (trimLine.contains("reset")) {
+            return WinFormFunMod.doReset(trimLine);
+        }
+        // Winform的protect屬性，用於設為唯獨
+        else if (trimLine.contains(".protect")) {
+            return WinFormFunMod.doProtect(trimLine);
         }
 
         // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
@@ -188,7 +196,7 @@ public class AssignMod {
         }
         // getitemstring(row,"ls_mwb_no") Winform函數
         else if (func.startsWith("getitemstring")) {
-            func = WinFormFunMod.getitemstring(line, true);
+            func = WinFormFunMod.doGetitemstring(line, true);
         }
 
 

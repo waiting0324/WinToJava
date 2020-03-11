@@ -11,7 +11,7 @@ public class WinFormFunMod {
 
     // getitemstring(row,"ls_mwb_no") → dw_master.getMwbNo();
     // isAssignPatten: 是否為賦值情況
-    public static String getitemstring(String line, boolean isAssignPatten) {
+    public static String doGetitemstring(String line, boolean isAssignPatten) {
         line = line.replace("\"", "\'");
         String prop = StrUtil.subAfter(StrUtil.subBetween(line, "\'", "\'"), "_", false);
         if (isAssignPatten) {
@@ -64,6 +64,7 @@ public class WinFormFunMod {
         return StrUtil.format("dw_master.{}({});", StrUtil.genSetter(prop), value);
     }
 
+    // Winform的triggerevent()函數 dw_detail.triggerevent("ue_update")
     public static String doTriggerevent(String line) {
 
         String funcName = StrUtil.subBetween(line, "(", ")");
@@ -71,5 +72,20 @@ public class WinFormFunMod {
         funcName = StrUtil.unWrap(funcName, "\"", "\"");
 
         return StrUtil.format("{}();", StrUtil.toCamelCase(funcName));
+    }
+
+    // Winform的reset()函數 dw_master.reset()
+    public static String doReset(String line) {
+        String pojo = StrUtil.subBefore(line, ".", false).trim();
+        return StrUtil.format("{} = new {}();", pojo, pojo);
+    }
+
+    // Winform的protect屬性，用於設為唯獨
+    public static String doProtect(String line) {
+        return "// " + line;
+    }
+
+    public static String doEndEvent(String line) {
+        return "}";
     }
 }

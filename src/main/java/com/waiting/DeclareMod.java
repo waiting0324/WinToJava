@@ -70,6 +70,10 @@ public class DeclareMod {
 
     // integer li_i, li_j → igDecimal li_i = BigDecimal.ZERO, li_j = BigDecimal.ZERO;
     static String doNum(String line, String type) {
+
+        // 去除 = 0 聲明
+        line = line.replace(" = 0", "");
+
         line = "BigDecimal " + StrUtil.subAfter(line, type, false).trim();
         String[] split = StrUtil.split(line, ",");
         StrUtil.trim(split);

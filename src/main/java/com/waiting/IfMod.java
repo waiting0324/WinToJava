@@ -66,14 +66,34 @@ public class IfMod {
         //  &&、||都存在，且&&在||前面   or  只有 &&
         if ((andIndex != -1 && orIndex != -1 && andIndex < orIndex)
             || (andIndex > 0 && orIndex == -1)) {
-            return trasIfCondition(StrUtil.subBefore(condi, "&&", false))
-                    + " && " +trasIfCondition(StrUtil.subAfter(condi, "&&", false));
+
+            // 如果有外層括號則去除
+            if (StrUtil.isWrap(condi.trim(), "(", ")")) {
+                condi = StrUtil.unWrap(condi.trim(), "(", ")");
+                return StrUtil.format(" ({} && {})", trasIfCondition(StrUtil.subBefore(condi, "&&", false)),
+                        trasIfCondition(StrUtil.subAfter(condi, "&&", false)));
+            }
+            // 沒有外層括號
+            else {
+                return trasIfCondition(StrUtil.subBefore(condi, "&&", false))
+                        + " && " +trasIfCondition(StrUtil.subAfter(condi, "&&", false));
+            }
         }
         // && 、||都存在，且||在&&前面   or  只有||
         else if ((andIndex != -1 && orIndex != -1 && orIndex < andIndex)
             || (orIndex > 0 && andIndex == -1)) {
-            return trasIfCondition(StrUtil.subBefore(condi, "||", false))
-                    + " || " + trasIfCondition(StrUtil.subAfter(condi, "||", false));
+
+            // 如果有外層括號則去除
+            if (StrUtil.isWrap(condi.trim(), "(", ")")) {
+                condi = StrUtil.unWrap(condi.trim(), "(", ")");
+                return StrUtil.format(" ({} || {})", trasIfCondition(StrUtil.subBefore(condi, "||", false)),
+                        trasIfCondition(StrUtil.subAfter(condi, "||", false)));
+            }
+            // 沒有外層括號
+            else {
+                return trasIfCondition(StrUtil.subBefore(condi, "||", false))
+                        + " || " + trasIfCondition(StrUtil.subAfter(condi, "||", false));
+            }
         }
         // ************* 遞迴拆分條件判斷結束 *****************//
 
@@ -130,7 +150,7 @@ public class IfMod {
             }
             // Winform內置函數處理 dw_master情況
             if (condiLeft.startsWith("getitemstring")) {
-                condiLeft = WinFormFunMod.getitemstring(condiLeft, false);
+                condiLeft = WinFormFunMod.doGetitemstring(condiLeft, false);
             }
             // dw_detail.getitemstring(i,'overdue_flag')
             else if (condiLeft.contains(".getitemstring")) {
@@ -249,10 +269,6 @@ public class IfMod {
         String func = null;
         if (trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "then","//");
         if (!trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "then",true);
-        // 兼容Java語句
-        /*if (StrUtil.isBlank(func) && trimLine.contains("//")) func = StrUtil.subBetween(trimLine, "{","//").trim();
-        if (StrUtil.isBlank(func) && !trimLine.contains("//")) func = StrUtil.subAfter(trimLine, "{",true).trim();
-        func = func.replace("}", "").trim();*/
 
         // 註釋
         String comment = StrUtil.subAfter(trimLine, "//", true);

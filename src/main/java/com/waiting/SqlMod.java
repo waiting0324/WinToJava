@@ -320,7 +320,12 @@ public class SqlMod {
         if (params.size() != 0) {
             result += "param = new HashMap(); \n";
             for (String param : params) {
-                result = result + "param.put(\"" + param + "\", " + param + ");\n";
+                // gs_uinfo.u_cargo_loca 做特殊處理
+                if ("gs_uinfo.u_cargo_loca".equals(param)) {
+                    result = result + "param.put(\"" + param + "\", u_cargo_loca);\n";
+                } else {
+                    result = result + "param.put(\"" + param + "\", " + param + ");\n";
+                }
             }
         }
 
