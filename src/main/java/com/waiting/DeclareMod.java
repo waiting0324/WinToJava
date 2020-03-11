@@ -25,7 +25,7 @@ public class DeclareMod {
         }
         // 此種函數聲明類型 global function integer f_register_customer (string arg_cargo, string arg_register_no, string arg_err_show);
         else {
-            funcName = StrUtil.toCamelCase(StrUtil.subBetween(line.replace("global function", ""), " ", "(").trim());
+            funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, "integer", "(").trim());
             // 參數字串
             String paramStr = StrUtil.subBetween(line, "(", ")");
             // 參數關鍵字取代
@@ -38,7 +38,7 @@ public class DeclareMod {
         result += "String sql;\n";
         result += "Map<String, Object> param;\n";
         result += "Map<String, Object> resultMap;\n";
-        result += "List<Object> resultList;\n";
+        result += "List<Map<String, Object>> resultList;\n";
 
         return result;
     }

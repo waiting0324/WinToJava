@@ -97,12 +97,12 @@ public class MainMod {
                 // 查詢語句
                 else if (StrUtil.startWithIgnoreCase(trimLine, "SELECT")) {
                     String oriSql = SqlMod.getOriSql(line, reader);
-                    line = SqlMod.doSelect(oriSql);
+                    line = SqlMod.doSelect(oriSql, false);
                 }
 
                 // 函數聲明
                 else if (StrUtil.startWithAny(trimLine, "event")
-                        || StrUtil.startWithIgnoreCase(trimLine, "global function")) {
+                        || StrUtil.contains(trimLine, "function")) {
                     line = DeclareMod.doFuncDecl(line);
                 }
                 // 返回
@@ -131,7 +131,7 @@ public class MainMod {
                 }
 
                 // switch處理
-                else if (StrUtil.startWithAny(trimLine, "choose", "case", "end choose")) {
+                else if (StrUtil.startWithAny(trimLine, "CHOOSE", "CASE", "END CHOOSE")) {
                     line = SwitchMod.doSwitch(line);
                 }
 

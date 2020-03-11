@@ -247,6 +247,9 @@ public class IfMod {
     // 處理if語句
     public static String doIf(String line, BufferedReader reader) throws IOException {
 
+        // SQL 查詢錯誤 則變為註釋
+        if (line.contains("sqlca.sqlcode")) return "// " + line;
+
         // 替換關鍵字
         line = line.replace("and", "&&").replace(" or ", " || ")
                 .replace("\'", "\"").replace("<>", "!=")

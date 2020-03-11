@@ -13,14 +13,14 @@ public class SwitchMod {
 
         String trimLine = line.trim();
 
-        if (trimLine.startsWith("choose")) {
-            String param = StrUtil.splitTrim(trimLine, "case").get(1);
-            line = StrUtil.format("switch ({}) {", param);
-        } else if (trimLine.startsWith("case")) {
+        if (trimLine.startsWith("CHOOSE")) {
+            String param = StrUtil.splitTrim(trimLine, "CASE").get(1);
+            line = StrUtil.format("switch ({}) { \n // TODO break 修正", param);
+        } else if (trimLine.startsWith("CASE")) {
             String param = trimLine.split(" ")[1];
             param = param.replace("\'", "\"");
-            line = StrUtil.format("case {}:", param);
-        } else if (trimLine.startsWith("end")) {
+            line = StrUtil.format("break;\ncase {}:", param);
+        } else if (trimLine.startsWith("END")) {
             line = "}";
         }
 

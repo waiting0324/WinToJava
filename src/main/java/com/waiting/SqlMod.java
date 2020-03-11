@@ -316,8 +316,9 @@ public class SqlMod {
     /**
      * 處理SQL查詢語句
      * @param oriSql 格式化過後的SQL語句
+     * @param isMultiResult 是否為多個查詢結果
      */
-    public static String doSelect(String oriSql) throws IOException {
+    public static String doSelect(String oriSql, boolean isMultiResult) throws IOException {
 
         // 是否為 此種SQL類型 select custom_id into :ls_custom_id
         boolean isIntoTypeSql = StrUtil.containsIgnoreCase(oriSql, "into");
@@ -362,12 +363,21 @@ public class SqlMod {
 
         result.append("\n");
 
-        // 增加持久層查詢語句  resMap = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
+        // 增加持久層查詢語句  resultList = (Map<String, String>) custVirtualAccountRepoitory.findMapByNativeSql(sql, param);
         String table = tables[0];
         table = StrUtil.toCamelCase(table);
         result.append("resultList = " + table + "Repository.findMapByNativeSql(sql, param);\n");
-        result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
-        result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");
+
+        // 有多筆查詢結果
+        if (isMultiResult) {
+            result.append("for(resultMap : resultList) {\n");
+        }
+        // 查詢結果僅有一筆
+        else {
+            result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
+            result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");
+        }
+
 
         // 查詢結果封裝 ls_temp = resultMap.get("LS_TEMP");
         for (String selecColumn : selecColumns) {
@@ -384,6 +394,11 @@ public class SqlMod {
             } else {
                 result.append("ls_" + selecColumn.toLowerCase() + " = (String) resultMap.get(\"" + selecColumn.toUpperCase() + "\");\n");
             }
+        }
+
+        // 多筆查詢結果則加上下括弧
+        if (isMultiResult) {
+            result.append("}\n");
         }
 
         return result.toString();

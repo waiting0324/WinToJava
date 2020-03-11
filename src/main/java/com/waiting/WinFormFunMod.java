@@ -140,7 +140,7 @@ public class WinFormFunMod {
             oriSql = SqlMod.getOriSqlByString(oriSql);
 
             result.append("// " + sqlName + " SQL聲明 獲取開始 \n");
-            result.append(SqlMod.doSelect(oriSql));
+            result.append(SqlMod.doSelect(oriSql, true));
             result.append("\n// " + sqlName + " SQL聲明 獲取結束 \n");
 
             return result.toString();
