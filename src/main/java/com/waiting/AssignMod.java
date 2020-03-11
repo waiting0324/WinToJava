@@ -2,6 +2,8 @@ package com.waiting;
 
 import cn.hutool.core.util.StrUtil;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -122,6 +124,13 @@ public class AssignMod {
             func = StrUtil.format("{}.{}", pojo, prop);
         }
 
+        // 是否為四捨五入
+        boolean isRounding = false;
+        if (StrUtil.isWrap(func, "round(", ",0)")) {
+            func = StrUtil.unWrap(func, "round(", ",0)");
+            isRounding = true;
+        }
+
         // 單純賦值為0  ll_non_rcv_cnt = 0
         if ("0".equals(func)) {
             func = "BigDecimal.ZERO";
@@ -148,7 +157,7 @@ public class AssignMod {
             } else if (func.contains("*")) {
                 operator = "multiply";
                 params = func.split("\\*");
-            } else if (func.contains("+")) {
+            } else if (func.contains("/")) {
                 operator = "divide";
                 params = func.split("/");
             }
@@ -199,8 +208,10 @@ public class AssignMod {
             func = WinFormFunMod.doGetitemstring(line, true);
         }
 
-
-
+        // 要求四捨五入
+        if (isRounding) {
+            func += ".setScale(0, RoundingMode.HALF_UP)";
+        }
 
         // 有注釋
         if (!"".equals(comment)) {

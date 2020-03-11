@@ -29,13 +29,27 @@ public class WinFormFunMod {
     // 處理Winform setitem函數 變成 屬性賦值格式
     // dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.pay_by_cash = "Y"
     public static String doSetitemToPojoType(String trimLine) {
+
+        String comment = null;
+        // 有註釋
+        if (trimLine.contains("//")) {
+            comment = StrUtil.subAfter(trimLine, "//", true);
+            trimLine = StrUtil.subBefore(trimLine, "//", true).trim();
+        }
+
         String pojo = StrUtil.subBefore(trimLine, ".", false).trim();
         String prop = StrUtil.subBetween(trimLine.split(",")[1], "\'", "\'")
                 .replace("ls_", "").replace("li_", "")
                 .replace("ll_", "").replace("ld_", "").trim();
-        String value = StrUtil.subAfter(trimLine, ",", true)
-                .replace(")", "").replace("\'", "\"");
-        trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);
+        String value = StrUtil.sub(StrUtil.subAfter(trimLine, "',", true)
+                .replace("\'", "\""), 0, -1);
+
+        if (comment == null) {
+            trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);
+        } else {
+            trimLine = StrUtil.format("{}.{} = {} // {}", pojo, prop, value, comment);
+        }
+
         return trimLine;
     }
 

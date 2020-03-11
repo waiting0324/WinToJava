@@ -264,9 +264,9 @@ public class IfMod {
         // 條件判斷式
         String condi = StrUtil.subBetween(line, "if", "then");
         // 兼容Java語句
-        if (condi == null) condi =  StrUtil.subBetween(line, "if", "{");
+       /* if (condi == null) condi =  StrUtil.subBetween(line, "if", "{");
         condi = condi.trim();
-        if (StrUtil.isWrap(condi, "(", ")")) condi = StrUtil.unWrap(condi, "(", ")").trim();
+        if (StrUtil.isWrap(condi, "(", ")")) condi = StrUtil.unWrap(condi, "(", ")").trim();*/
 
         // 執行語句
         String func = null;
