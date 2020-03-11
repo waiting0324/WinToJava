@@ -2,6 +2,10 @@ package com.waiting;
 
 import cn.hutool.core.util.StrUtil;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.Map;
+
 /**
  * @author 6550
  * @date 2020/3/4 下午 03:07
@@ -85,7 +89,64 @@ public class WinFormFunMod {
         return "// " + line;
     }
 
+    // Winform 函數結束關鍵字
     public static String doEndEvent(String line) {
         return "}";
+    }
+
+    // Winform 聲明 SQL   Declare charge_sp_cur cursor for
+    public static String doDeclare(String line, BufferedReader reader, Map<String, String> declareSql) throws IOException {
+
+        // SQL 名稱
+        String sqlName = StrUtil.subBetween(line, "Declare", "cursor").trim();
+
+        // SQL 語句
+        StringBuilder oriSql = new StringBuilder();
+        while (!StrUtil.contains(line = reader.readLine(), ";")) {
+            oriSql.append(line + "\n");
+        }
+        // 將聲明的SQL存到declareSql中，key為 charge_sp_cur，value為sql語句
+        declareSql.put(sqlName, oriSql.toString());
+
+        return "";
+    }
+
+    // Winform 開始使用之前聲明的SQL語句
+    public static String doOpen(String line, BufferedReader reader, Map<String, String> declareSql) throws IOException {
+
+        if (reader.readLine().trim().startsWith("DO WHILE")) {
+
+            StringBuilder result = new StringBuilder();
+
+            // 獲取要求的SQL名稱
+            String sqlName = StrUtil.subAfter(reader.readLine(), "FETCH", false).trim();
+            // 取得之前暫存的SQL語句
+            String oriSql = declareSql.get(sqlName);
+
+            // 取得 into部分的SQL語句
+            StringBuilder intoSql = new StringBuilder();
+            while (true) {
+                line = reader.readLine();
+                if (line.contains(";")) {
+                    if (!line.replace(";", "").isBlank()) intoSql.append(line.replace(";", "") + "\n");
+                    break;
+                }
+                intoSql.append(line + "\n");
+            }
+
+            // 將into部分的SQL插入到from關鍵字前面
+            oriSql = StrUtil.format("{} {} from {}", StrUtil.subBefore(oriSql, "from", true), intoSql, StrUtil.subAfter(oriSql, "from", true));
+            // 取得格式化之後的SQL
+            oriSql = SqlMod.getOriSqlByString(oriSql);
+
+            result.append("// " + sqlName + " SQL聲明 獲取開始 \n");
+            result.append(SqlMod.doSelect(oriSql));
+            result.append("\n// " + sqlName + " SQL聲明 獲取結束 \n");
+
+            return result.toString();
+        }
+
+
+        return ">>>>>>>>> FETCH SQL 時發生錯誤，請檢查 <<<<<<<<<<";
     }
 }

@@ -1,3 +1,29 @@
+public function integer wf_charge_sp (string invoice_no);string  ls_fee_date, ls_inc_id, ls_mwb_no, ls_mwb_no2, ls_hwb_no, ls_work_type, ls_charge_type
+string  ls_start_date, ls_end_date, ls_full_name, ls_address, ls_cargo_location, ls_inv_tax_adjust
+string  ls_charge_desc, ls_work_name, nt_dollar, nt_dollar_temp, ls_check_num
+string  ls_upd_user, ls_payment_type, ls_apply_no, ls_gate_no, ls_custom_id
+string  ls_gci_date, ls_airline_id, ls_flt_no, ls_flt_date, ls_user_name, ls_return_type
+string  ls_prev_no, ls_memo, ls_open_date, ls_agent_code, ls_tax_mark, ls_storage_mark
+string  ls_e_print_result, ls_print_invoice
+integer i, li_charge_sp_cnt
+long    ll_pay_amount, ll_tax, ttl_pay_amt, ttl_tax, ll_ar_amount, ll_over_amount, ttl_over_amt
+long    ll_pay_tax, ll_over_amt_without_tax, ttl_pay_tax = 0, ttl_over_without_tax = 0
+decimal ld_tax_rate, ld_calc_wet, ld_vol_wet, ld_wet
+
+i = 0
+ld_tax_rate = dw_master.getitemdecimal(dw_master.getrow(),"ld_tax_rate")
+select count(*)
+  into :li_charge_sp_cnt
+  from charge_sp
+  where invoice_no = :invoice_no
+ ;
+ 
+if isnull(li_charge_sp_cnt) then li_charge_sp_cnt = 0
+if li_charge_sp_cnt = 0 then 
+	messagebox("異常","發票號碼:"+invoice_no+"查無收費詳細記錄可列印")
+	return 1
+end if
+Declare charge_sp_cur cursor for
 select charge_sp.cargo_location, 
        charge_sp.work_type, 
 		 charge_sp.charge_type,
@@ -31,39 +57,6 @@ select charge_sp.cargo_location,
 		 nvl(registered_customer.inv_tax_adjust,'N') inv_tax_adjust,
 		 nvl(charge_sp.over_amount,0),
 		 decode(invoice_master.device_id,null,'Y','N') print_invoice
-		 INTO :ls_cargo_location,
-         			:ls_work_type,
-         			:ls_charge_type,
-         			:ls_start_date,
-         			:ls_end_date,
-         			:ld_vol_wet,
-         			:ld_wet,
-         			:ll_ar_amount,
-         			:ll_over_amount,
-         			:ll_pay_amount,
-         			:ll_tax,
-         			:ll_pay_tax,
-         			:ls_prev_no,
-         			:ls_storage_mark,
-         			:ls_fee_date,
-         			:ls_user_name,
-         			:ls_fee_date,
-         			:ls_mwb_no,
-         			:ls_mwb_no2,
-         			:ls_hwb_no,
-         			:ls_payment_type,
-         			:ls_apply_no,
-         			:ls_gci_date,
-         			:ls_airline_id,
-         			:ls_flt_no,
-         			:ls_flt_date,
-         			:ls_agent_code,
-         			:ls_custom_id,
-         			:ls_return_type,
-         			:ls_upd_user,
-         			:ls_inv_tax_adjust,
-         			:ll_over_amt_without_tax,
-         			:ls_print_invoice
   from charge_sp, 
        invoice_master,
        app05,
@@ -75,3 +68,235 @@ select charge_sp.cargo_location,
 	and charge_sp.cargo_location = registered_customer.cargo_location (+)
 	and charge_sp.custom_id      = registered_customer.register_no    (+)
 	  ;
+
+
+
+string  ls_upd_user, ls_payment_type, ls_apply_no, ls_gate_no, ls_custom_id
+string  ls_gci_date, ls_airline_id, ls_flt_no, ls_flt_date, ls_user_name, ls_return_type
+string  ls_prev_no, ls_memo, ls_open_date, ls_agent_code, ls_tax_mark, ls_storage_mark
+string  ls_e_print_result, ls_print_invoice
+integer i, li_charge_sp_cnt
+long    ll_pay_amount, ll_tax, ttl_pay_amt, ttl_tax, ll_ar_amount, ll_over_amount, ttl_over_amt
+long    ll_pay_tax, ll_over_amt_without_tax, ttl_pay_tax = 0, ttl_over_without_tax = 0
+decimal ld_tax_rate, ld_calc_wet, ld_vol_wet, ld_wet
+
+OPEN charge_sp_cur;
+DO WHILE true 
+	FETCH charge_sp_cur 
+	 INTO :ls_cargo_location,
+			:ls_work_type,
+			:ls_charge_type,
+			:ls_start_date,
+			:ls_end_date, 
+			:ld_vol_wet,
+			:ld_wet, 
+			:ll_ar_amount,
+			:ll_over_amount,
+			:ll_pay_amount,
+			:ll_tax, 
+			:ll_pay_tax,
+			:ls_prev_no,
+			:ls_storage_mark,
+			:ls_fee_date,
+			:ls_user_name,
+			:ls_fee_date,
+			:ls_mwb_no, 
+			:ls_mwb_no2,
+			:ls_hwb_no,
+			:ls_payment_type, 
+			:ls_apply_no, 
+			:ls_gci_date,
+			:ls_airline_id,
+			:ls_flt_no, 
+			:ls_flt_date,
+			:ls_agent_code,
+			:ls_custom_id,
+			:ls_return_type,
+			:ls_upd_user,
+			:ls_inv_tax_adjust,
+			:ll_over_amt_without_tax,
+			:ls_print_invoice
+			;
+   if sqlca.sqlcode <> 0 then exit
+	i++
+	if i = 1 then
+		dw_invoice.setitem(1,'fee_yy', string(integer(mid(ls_fee_date,1,4)) - 1911))
+		dw_invoice.setitem(1,'fee_mm', mid(ls_fee_date,5,2))
+		dw_invoice.setitem(1,'fee_dd', mid(ls_fee_date,7,2))
+		dw_invoice.setitem(1,'mwb_no', ls_mwb_no+'─'+ls_mwb_no2)	
+		dw_invoice.setitem(1,'hwb_no', ls_hwb_no)
+//		dw_invoice.setitem(1,'upd_user', ls_user_name)
+		dw_invoice.setitem(1,'upd_user', ls_upd_user)
+		dw_invoice.setitem(1,'agent_code', ls_agent_code)	//報關箱號
+		dw_invoice.setitem(1,'custom_id', ls_custom_id)	   //記帳客編
+		dw_invoice.setitem(1,'apply_no', ls_apply_no)	  
+	end if
+	ls_work_name = ''
+	CHOOSE CASE ls_work_type
+	CASE 'I'
+		ls_work_name = '進口'
+	CASE 'E'
+		ls_work_name = '出口'
+	CASE 'X'
+		ls_work_name = '機放進口'
+	CASE 'P'
+		ls_work_name = '機放出口'
+	CASE 'T'		
+		ls_work_name = '空轉空'
+	END CHOOSE
+	if ls_storage_mark = 'Y' then
+		select charge_desc
+		  into :ls_charge_desc
+		  from charge_set
+		 where cargo_location = :ls_cargo_location
+			and work_type 		 = :ls_work_type
+			and charge_type    = :ls_charge_type
+			and fee_group 		 = '0' ;
+	else	
+		select charge_desc
+		  into :ls_charge_desc
+		  from others_rate
+		 where cargo_location = :ls_cargo_location
+			and effect_date   <= :ls_fee_date
+			and charge_type    = :ls_charge_type ;
+	end if
+	//備註
+	ls_memo = ''
+	ld_calc_wet = ld_wet
+	if ld_vol_wet > ld_wet then
+		ld_calc_wet = ld_vol_wet
+		dw_invoice.setitem(1,'vol_wet'+string(i), ld_vol_wet)
+		ls_memo += '體積計費 '
+	else
+		dw_invoice.setitem(1,'vol_wet'+string(i), ld_wet)
+	end if
+	if ld_calc_wet < 20 and ls_storage_mark = 'Y' then ls_charge_desc += '  *'
+	dw_invoice.setitem(1,'arg_desc'+string(i), trim(ls_work_name) + trim(ls_charge_desc))
+	dw_invoice.setitem(1,'pay_amount'+string(i), ll_pay_amount) 
+	dw_invoice.setitem(1,'start_date'+string(i), ls_start_date)
+	dw_invoice.setitem(1,'end_date'+string(i), ls_end_date)
+	if ls_prev_no <> '' then
+		if asc(mid(ls_prev_no,1,1)) >= 65 then
+			select to_char(to_date(end_date,'yyyy/mm/dd'),'yyyy/mm/dd')
+			  into :ls_open_date
+			  from charge_sp
+			 where invoice_no = :ls_prev_no;
+		else
+			select to_char(to_date(end_date,'yyyy/mm/dd'),'yyyy/mm/dd')
+			  into :ls_open_date
+			  from charge_sp
+			 where declare_no = :ls_prev_no;
+		end if
+		ls_memo += trim(ls_open_date)
+	end if
+	if i = 1 then
+		dw_invoice.setitem(1, 'memo', ls_memo)
+	else
+		dw_invoice.setitem(1, 'memo'+string(i), ls_memo)
+	end if
+	ttl_pay_amt += ll_ar_amount 
+	if ls_return_type = '1' then
+		ttl_over_amt += ll_over_amount //線上才算優惠金額
+	   ttl_pay_tax  += ll_pay_tax            //優惠後稅額 
+		ttl_over_without_tax += ll_over_amt_without_tax 
+	end if
+LOOP
+CLOSE charge_sp_cur;
+
+if i < 1 then
+	messagebox('訊息','無發票可列印')
+	return 1
+end if
+dw_invoice.setitem(1,'invoice_no', invoice_no)		
+ls_check_num = string(f_check_num(invoice_no), '0000')
+dw_invoice.setitem(1,'check_no', ls_check_num)	//檢查號碼	
+select inc_id    , full_name    , address    , tax_mark
+  into :ls_inc_id, :ls_full_name, :ls_address, :ls_tax_mark
+  from invoice_master
+ where invoice_no = :invoice_no;
+ 
+dw_invoice.setitem(1,'full_name', ls_full_name)
+dw_invoice.setitem(1,'address', ls_address)
+dw_invoice.setitem(1,'inc_id', ls_inc_id)	
+CHOOSE CASE ls_tax_mark		//營業稅別
+CASE '1'
+	dw_invoice.setitem(1,'tax_mark1', 'Ｖ')
+CASE '2'
+	dw_invoice.setitem(1,'tax_mark2', 'Ｖ')
+CASE '3'
+	dw_invoice.setitem(1,'tax_mark3', 'Ｖ')
+END CHOOSE
+
+dw_invoice.setitem(1,'ttl_pay_amt', ttl_pay_amt)
+ttl_tax = round(ttl_pay_amt * (ld_tax_rate / 100),0)
+dw_invoice.setitem(1,'ttl_tax', ttl_tax)	//稅額
+dw_invoice.setitem(1,'ttl_amt', ttl_pay_amt + ttl_tax)	
+
+if (ttl_over_without_tax <> 0 and ls_payment_type = 'C') or (ttl_over_without_tax <> 0 and ls_inv_tax_adjust = 'Y') then
+	dw_invoice.setitem(1 ,'memo8','折讓：'+string(ttl_over_without_tax,"###,###,###"))  //寫於發票備註8
+	ttl_pay_amt -= ttl_over_without_tax
+	dw_invoice.setitem(1,'ttl_pay_amt', ttl_pay_amt)
+	ttl_tax = ttl_pay_tax
+	dw_invoice.setitem(1,'ttl_tax', ttl_tax)	//稅額
+	dw_invoice.setitem(1,'ttl_amt', ttl_pay_amt + ttl_tax)
+end if
+
+//金額大寫轉換
+nt_dollar = ''
+for i = 1 to 8
+	nt_dollar_temp = f_amt_in_words(mid(string(ttl_pay_amt + ttl_tax, '00000000'),i,1))
+	nt_dollar = trim(nt_dollar) + trim(nt_dollar_temp)		
+next
+dw_invoice.setitem(1,'c_amt1',mid(nt_dollar,1,2))
+dw_invoice.setitem(1,'c_amt2',mid(nt_dollar,3,2))
+dw_invoice.setitem(1,'c_amt3',mid(nt_dollar,5,2))
+dw_invoice.setitem(1,'c_amt4',mid(nt_dollar,7,2))
+dw_invoice.setitem(1,'c_amt5',mid(nt_dollar,9,2))
+dw_invoice.setitem(1,'c_amt6',mid(nt_dollar,11,2))
+dw_invoice.setitem(1,'c_amt7',mid(nt_dollar,13,2))
+dw_invoice.setitem(1,'c_amt8',mid(nt_dollar,15,2))
+
+if f_get_fdate() >= '20140301' then
+	CHOOSE CASE ls_payment_type
+		CASE 'C'
+			dw_invoice.setitem(1,'payment_type', '現金')
+		CASE 'N'
+			dw_invoice.setitem(1,'payment_type', '週現')
+		CASE 'K'  //半月現開
+			dw_invoice.setitem(1,'payment_type', '半月現')
+		CASE 'L'  //月現開0')
+			dw_invoice.setitem(1,'payment_type', '月現')
+	END CHOOSE
+else
+
+	CHOOSE CASE ls_payment_type
+		CASE 'C'
+			dw_invoice.setitem(1,'payment_type', '現金: 應收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0))+' - '+string(ttl_over_amt)+' = 實收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0) - ttl_over_amt))
+		CASE 'N'
+			dw_invoice.setitem(1,'payment_type', '週現: 應收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0))+' - '+string(ttl_over_amt)+' = 實收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0) - ttl_over_amt))
+		CASE 'K'  //半月現開
+			dw_invoice.setitem(1,'payment_type', '半月現: 應收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0))+' - '+string(ttl_over_amt)+' = 實收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0) - ttl_over_amt))
+		CASE 'L'  //月現開
+			dw_invoice.setitem(1,'payment_type', '月現: 應收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0))+' - '+string(ttl_over_amt)+' = 實收'+string(round(ttl_pay_amt * (1 + (ld_tax_rate/100)),0) - ttl_over_amt))
+	END CHOOSE
+end if
+if ls_upd_user = 'eds' or ls_upd_user = 'edsk' then //使用 eds or edsk帳號 不傳送電子發票&發票列印資料
+	//dw_invoice.visible = true
+else
+	ls_e_print_result = f_einvoice(gs_uinfo.u_cargo_loca,invoice_no) //產生電子發票資料 add @ 2017/09/12
+	if upper(ls_e_print_result) = 'OK' then
+		if ls_print_invoice = 'Y' then
+			ls_e_print_result = f_einvoice_print(gs_uinfo.u_cargo_loca,invoice_no,'N')
+			if upper(ls_e_print_result) <> 'OK' then //產生電子發票列印資料 add @ 2017/09/12
+				messagebox('傳送電子發票列印資料失敗',ls_e_print_result)
+			end if
+		else		
+			messagebox("訊息","使用發票載具不提供紙本電子發票")
+		end if
+	else
+		messagebox('傳送電子發票開立資料失敗',ls_e_print_result)
+	end if
+end if
+
+return 0
+end function

@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -25,6 +26,8 @@ public class MainMod {
     public static void doMain(BufferedReader reader, BufferedWriter writer, boolean isApiDoc) throws IOException {
 
         StringBuilder result = new StringBuilder();
+        // 用Declare關鍵字聲明的SQL語句(不會馬上使用)
+        Map<String, String> declareSql = new HashMap<>();
 
         try {
             while (true) {
@@ -52,9 +55,16 @@ public class MainMod {
 
                     line = ApiMod.doApi(line, writer);
                 }
+                // Winform用Declare聲明SQL語句
+                else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")) {
+                    line = WinFormFunMod.doDeclare(line, reader, declareSql);
+                }
+                // Winform 開始使用之前聲明的SQL語句
+                else if (StrUtil.startWithIgnoreCase(trimLine, "OPEN")) {
+                    line = WinFormFunMod.doOpen(trimLine, reader, declareSql);
+                }
                 // 如果是  聲明List、json開頭、開頭中文  則變成注釋
-                else if (StrUtil.startWithIgnoreCase(trimLine, "DECLARE")
-                        || (Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find() && !trimLine.contains("mes")
+                else if ((Pattern.compile( "^[\u4e00-\u9fa5]" ).matcher(trimLine).find() && !trimLine.contains("mes")
                             && !trimLine.contains("//"))) {
                     line =  "// " + line.trim();
                 }

@@ -1,5 +1,6 @@
 package com.waiting;
 
+import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.BufferedReader;
@@ -54,6 +55,35 @@ public class SqlMod {
         }
 
         return "\" " + oriSql.toString();
+    }
+
+    public static String getOriSqlByString(String sql) throws IOException {
+
+        StringBuilder oriSql = new StringBuilder();
+
+        String[] sqlLines = sql.split("\n");
+        for (String line : sqlLines) {
+            line = line.replace("\"", "");
+            line = line.trim();
+
+            // 空格格式化
+            if (StrUtil.startWithIgnoreCase(line, "FROM")) {
+                line = "   " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "WHERE")) {
+                line = " " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "AND")) {
+                line = "   " + line;
+            } else if (StrUtil.startWithIgnoreCase(line, "ORDER")) {
+                line = " " + line;
+            } else {
+                line = " " + line;
+            }
+
+            // 尾部增加+號
+            oriSql.append("\" " + line + "  \" \u002B \n");
+        }
+
+        return oriSql.toString();
     }
 
     // 增加查詢欄位別名
