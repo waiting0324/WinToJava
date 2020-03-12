@@ -66,6 +66,7 @@ public class KeywordMod {
     // 關鍵字
     public static String doKeyword(String line) {
 
+        line = line.toLowerCase();
         String trimLine = line.trim();
 
         if (trimLine.startsWith("next")) {
@@ -112,9 +113,10 @@ public class KeywordMod {
         }
         // 是數字
         else if (NumberUtil.isNumber(line)) {
-            // 返回1則不處理
-            //if (line.equals("1")) return "";
-            result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, new BigDecimal(" + line + "), null);");
+            // return 0 則表示成功
+            if (Integer.parseInt(line) == 0) {
+                result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, null, null);");
+            }
         }
         // 返回JSON則標注待處理
         else if (StrUtil.startWithIgnoreCase(line, "json")) {

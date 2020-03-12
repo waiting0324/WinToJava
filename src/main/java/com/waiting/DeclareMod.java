@@ -23,6 +23,10 @@ public class DeclareMod {
             funcName = StrUtil.toCamelCase(line.replace("event", "").split(";")[0].trim());
             result = StrUtil.format("@Override\npublic TransactionData {}() {\n", funcName);
         }
+        // 函數結尾
+        else if ("end function".equals(line.trim())) {
+            return "}";
+        }
         // 此種函數聲明類型 global function integer f_register_customer (string arg_cargo, string arg_register_no, string arg_err_show);
         else {
             funcName = StrUtil.toCamelCase(StrUtil.subBetween(line, "integer", "(").trim());
@@ -31,7 +35,7 @@ public class DeclareMod {
             // 參數關鍵字取代
             paramStr = paramStr.replace("string", "String").replace("str", "String")
                     .replace("long", "BigDecimal").replace("decimal", "BigDecimal");
-            result = StrUtil.format("@Override\npublic TransactionData {} ({}) {\n", funcName, paramStr);
+            result = StrUtil.format("public TransactionData {} ({}) {\n", funcName, paramStr);
         }
 
         // 常用變量聲明

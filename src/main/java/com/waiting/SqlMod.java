@@ -397,9 +397,9 @@ public class SqlMod {
         }
 
         // 多筆查詢結果則加上下括弧
-        if (isMultiResult) {
+        /*if (isMultiResult) {
             result.append("}\n");
-        }
+        }*/
 
         return result.toString();
     }

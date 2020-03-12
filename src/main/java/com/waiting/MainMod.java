@@ -79,6 +79,11 @@ public class MainMod {
                     line = KeywordMod.doMessagebox(line, reader);
                 }
 
+                // 條件語句
+                else if (StrUtil.startWithIgnoreCase(trimLine, "if")) {
+                    line = IfMod.doIf(line, reader);
+                }
+
                 // 特殊運算符
                 else if (StrUtil.containsAny(trimLine, "+=", "++", "-=", "--")) {
                     line = AssignMod.doSpecialOperator(line);
@@ -87,11 +92,6 @@ public class MainMod {
                 // 參數賦值
                 else if (StrUtil.startWithAny(trimLine, "ls_", "li_", "ll_", "ld_", "arg_", "ttl_")) {
                     line = AssignMod.doAsignParam(line);
-                }
-
-                // 條件語句
-                else if (StrUtil.startWithIgnoreCase(trimLine, "if")) {
-                    line = IfMod.doIf(line, reader);
                 }
 
                 // 查詢語句
