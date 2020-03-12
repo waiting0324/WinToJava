@@ -30,7 +30,7 @@ public class AssignMod {
             return WinFormFunMod.doReset(trimLine);
         }
         // Winform的protect屬性，用於設為唯獨
-        else if (trimLine.contains(".protect")) {
+        else if (trimLine.contains(".protect") || trimLine.contains(".setfilter") || trimLine.contains(".filter") || trimLine.contains(".setcolumn") ) {
             return WinFormFunMod.doProtect(trimLine);
         }
 
@@ -282,7 +282,6 @@ public class AssignMod {
 
     // 擷取字串 substr(ls_valid_account,li_i,1)
     public static String doSubStr(String func) {
-//        func = func.replace("mid", "substr");
         String[] split = StrUtil.unWrap(func, "substr(", ")").split(",");
 
         if (split.length > 2) {

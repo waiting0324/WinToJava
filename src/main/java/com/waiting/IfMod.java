@@ -254,12 +254,13 @@ public class IfMod {
     public static String doIf(String line, BufferedReader reader) throws IOException {
 
         // SQL 查詢錯誤 則變為註釋
-        if (line.contains("sqlca.sqlcode")) return "// " + line;
+        if (line.contains("sqlca.sqlcode <> 0")) line = line.replace("sqlca.sqlcode <> 0", "SQLERROR");
 
         // 替換關鍵字
         line = line.replace("and", "&&").replace(" or ", " || ")
                 .replace("\'", "\"").replace("<>", "!=")
-                .replace("If", "if").replace("not ", "!");
+                .replace("If", "if").replace("IF", "if")
+                .replace("not ", "!");
 
         if (!StrUtil.containsAny(line, "then", "{")) {
             while (!StrUtil.containsAny(line += reader.readLine(), "then", "{")) ;
@@ -269,10 +270,6 @@ public class IfMod {
 
         // 條件判斷式
         String condi = StrUtil.subBetween(line, "if", "then");
-        // 兼容Java語句
-       /* if (condi == null) condi =  StrUtil.subBetween(line, "if", "{");
-        condi = condi.trim();
-        if (StrUtil.isWrap(condi, "(", ")")) condi = StrUtil.unWrap(condi, "(", ")").trim();*/
 
         // 執行語句
         String func = null;
@@ -291,6 +288,11 @@ public class IfMod {
             func = WinFormFunMod.doSetitemToPojoType(func);
         }
 
+        if (func.contains(".insertrow")) {
+            String pojo = StrUtil.subBefore(func, ".insertrow", false);
+            func = StrUtil.indexedFormat("{0} {0} = new {0}()", pojo);
+        }
+
         // 處理func
         if (func.contains(".")) {
             String pojo = func.split("\\.")[0];
@@ -299,7 +301,7 @@ public class IfMod {
             func = StrUtil.format("{}.{}({})", pojo, StrUtil.genSetter(StrUtil.toCamelCase(prop)), value);
         }
         // 不是空則為簡單參數賦值
-        else if (StrUtil.isNotBlank(func)) {
+        else if (StrUtil.isNotBlank(func) && !"exit".equals(func.trim()) && !func.trim().startsWith("messagebox") && func.contains(".insertrow")) {
             func = AssignMod.doAsignParam(func);
             // 去除分號；
             func = func.substring(0, func.length()-1);

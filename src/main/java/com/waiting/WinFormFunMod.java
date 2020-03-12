@@ -121,7 +121,7 @@ public class WinFormFunMod {
     public static String doDeclare(String line, BufferedReader reader, Map<String, String> declareSql) throws IOException {
 
         // SQL 名稱
-        String sqlName = StrUtil.subBetween(line, "Declare", "cursor").trim();
+        String sqlName = StrUtil.subBetween(line.toLowerCase(), "declare", "cursor").trim();
 
         // SQL 語句
         StringBuilder oriSql = new StringBuilder();

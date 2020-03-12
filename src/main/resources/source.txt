@@ -1,1 +1,623 @@
-dw_invoice.setitem(1,'ttl_amt', ttl_pay_amt + ttl_tax)
+event dw_master::itemfocuschanged;string   ls_work_type, ls_mwb_no, ls_mwb_no2, ls_hwb_no, ls_charge_type, ls_status
+string   ls_airline_id, ls_flt_no, ls_flt_date, ls_other_type, ls_gci_date, ls_end_date, ls_bank
+string   ls_cus_box_no, ls_decl_no, ls_storage_mark, ls_acct_no
+string   ls_comp_id, ls_account_no, ls_force, ls_pay_type, ls_date, ls_start_date, ls_effect_date
+string   ls_title, ls_addr, ls_fee_date, ls_prev_inv_no, ls_gco_date, ls_part
+string   ls_special, ls_class , ls_class_name, ls_return_type
+string   ls_storage_move, ls_credit_no, ls_combine_no, ls_cust_attribute
+integer  i, j, li_cnt, li_unit_quantity, li_charge_days, li_storage_days, li_min_charge
+decimal  ld_times, ld_inside_rate, ld_outside_rate, ld_tax_rate, ld_act_wet, ld_charge_wet
+datetime ldt_dt
+long     ll_other_amt, ll_overtake_amt, ll_credit_vol,ll_temp_vol, ll_used_vol, ll_c_pre_amt, ll_c_pre_over, ll_cnt
+long     ll_cnt_gco, ll_warning_vol, ll_over_amount
+boolean  lb_save, lb_delete_dtl
+boolean  lb_warning
+
+ls_date         = f_get_fdate()
+ls_work_type    = getitemstring(row,"ls_work_type")
+ls_mwb_no       = getitemstring(row,"ls_mwb_no")
+ls_mwb_no2      = getitemstring(row,"ls_mwb_no2")
+ls_hwb_no       = getitemstring(row,"ls_hwb_no")
+ls_comp_id      = getitemstring(row,"ls_comp_id")
+ls_account_no   = getitemstring(row,"ls_account_no")
+ls_force        = getitemstring(row,"ls_force")
+ls_bank         = getitemstring(row,"ls_bank")
+ls_pay_type     = getitemstring(row,"ls_pay_type")
+ls_other_type   = getitemstring(row,"ls_other_type")
+ld_times        = getitemdecimal(row,"ld_times")
+ls_storage_mark = getitemstring(row,"ls_charge_type")
+ls_fee_date 	 = getitemstring(row,"ls_fee_date")
+ls_gco_date     = getitemstring(dw_master.getrow(),'ls_gco_date')
+
+if isnull(ls_mwb_no)        then ls_mwb_no  = ''
+if isnull(ls_mwb_no2)       then ls_mwb_no2 = ''
+if isnull(ls_hwb_no)        then ls_hwb_no  = ''
+if len(trim(ls_hwb_no)) = 0 then ls_hwb_no  = ' '
+if isnull(ls_bank)          then ls_bank = 'N'
+if isnull(ls_gco_date)      then ls_gco_date = ''
+
+if len(trim(ls_mwb_no)) > 0 and len(trim(ls_mwb_no2)) > 0 then
+	if dw_master.getitemstring(1,'ls_charge_type') = '2' then //雜項
+		select max(agent_code),
+			    max(data_class)
+		  into :ls_cus_box_no,
+			    :ls_class
+		  from imp_special
+		 where cargo_location =:gs_uinfo.u_cargo_loca
+			and decode(data_class,'B',old_meb_no,'BE',old_meb_no,mwb_no)    =:ls_mwb_no
+			and decode(data_class,'B',old_mwb_no2,'BE',old_mwb_no2,mwb_no2) =:ls_mwb_no2
+			and decode(data_class,'B',old_hwb_no,'BE',old_hwb_no,hwb_no)    =:ls_hwb_no
+			and data_type      ='T'
+			and data_class     in ('B','BD','BC','BE')
+			and nvl(upd_date,sysdate) in
+			(  select max(nvl(upd_date,sysdate))
+				  from imp_special
+				 where cargo_location =:gs_uinfo.u_cargo_loca
+					and decode(data_class,'B',old_meb_no,'BE',old_meb_no,mwb_no)    =:ls_mwb_no
+					and decode(data_class,'B',old_mwb_no2,'BE',old_mwb_no2,mwb_no2) =:ls_mwb_no2
+					and decode(data_class,'B',old_hwb_no,'BE',old_hwb_no,hwb_no)    =:ls_hwb_no
+					and data_type      ='T'
+					and data_class     in ('B','BD','BC','BE')
+			)
+			;
+		if isnull(ls_cus_box_no) then ls_cus_box_no = ''
+		setitem(row,'ls_class',ls_class)
+		if len(trim(ls_cus_box_no)) > 0 then
+			setitem(row,'ls_box_id',ls_cus_box_no)
+			for i = 1 to dw_detail.rowcount()
+				dw_detail.setitem(i,'agent_code',ls_cus_box_no)
+			next
+		end if
+	else
+		dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)
+		dw_measure.setfilter('')
+		dw_measure.filter()
+		for i = 1 to dw_measure.rowcount()
+			ls_airline_id = dw_measure.getitemstring(i,'airline_id')
+			ls_flt_no     = dw_measure.getitemstring(i,'flt_no')
+			ls_gci_date   = dw_measure.getitemstring(i,'gci_date')
+			select max(agent_code)
+			  into :ls_cus_box_no
+			  from imp_special
+			 where cargo_location =:gs_uinfo.u_cargo_loca
+				and mwb_no         =:ls_mwb_no
+				and mwb_no2        =:ls_mwb_no2
+				and hwb_no         =:ls_hwb_no
+				and gci_date       =:ls_gci_date
+				and data_type      ='T'
+				and data_class     in ('B','BD','BC','BE')
+				and airline_id     =:ls_airline_id
+				and flt_no         =:ls_flt_no
+				and nvl(upd_date,sysdate) in
+				(  select max(nvl(upd_date,sysdate))
+					  from imp_special
+					 where cargo_location =:gs_uinfo.u_cargo_loca
+						and mwb_no         =:ls_mwb_no
+						and mwb_no2        =:ls_mwb_no2
+						and hwb_no         =:ls_hwb_no
+						and gci_date       =:ls_gci_date
+						and data_type      ='T'
+						and data_class     in ('B','BD','BC','BE')
+						and airline_id     =:ls_airline_id
+						and flt_no         =:ls_flt_no
+				)
+				;
+			if isnull(ls_cus_box_no) then ls_cus_box_no = ''
+			if len(trim(ls_cus_box_no)) > 0 then
+				setitem(row,'ls_box_id',ls_cus_box_no)
+				for j = 1 to dw_detail.rowcount()
+					dw_detail.setitem(j,'agent_code',ls_cus_box_no)
+				next
+			end if
+
+			select data_class,
+			       decode(data_class,'B','改標','B1','整理','B2','裝配','B3','分類','B4','檢測','B5','分割','B6','重整','B7','其他','BD','貨轉郵','BC','郵轉貨','BE','出口改航機',' ')
+			  into :ls_class ,
+			       :ls_class_name
+			  from (
+			select max(data_class) data_class
+			  from imp_special
+		    where cargo_location =:gs_uinfo.u_cargo_loca
+				and mwb_no         =:ls_mwb_no
+				and mwb_no2        =:ls_mwb_no2
+				and hwb_no         =:ls_hwb_no
+				and gci_date       =:ls_gci_date
+				and data_type      ='T'
+				and airline_id     =:ls_airline_id
+				and flt_no         =:ls_flt_no
+				and (decode(data_class,'BD',mwb_no || mwb_no2,'BC',mwb_no || mwb_no2,'BE',mwb_no || mwb_no2,old_meb_no || old_mwb_no2)) is not null
+				and nvl(upd_date,sysdate) in
+				    (  select max(nvl(upd_date,sysdate))
+					      from imp_special
+	  					  where cargo_location =:gs_uinfo.u_cargo_loca
+							 and mwb_no         =:ls_mwb_no
+							 and mwb_no2        =:ls_mwb_no2
+							 and hwb_no         =:ls_hwb_no
+							 and gci_date       =:ls_gci_date
+							 and data_type      ='T'
+							 and airline_id     =:ls_airline_id
+							 and flt_no         =:ls_flt_no
+							 and (decode(data_class,'BD',mwb_no || mwb_no2,'BC',mwb_no || mwb_no2,'BE',mwb_no || mwb_no2,old_meb_no || old_mwb_no2)) is not null
+				    )
+				)
+				;
+			if isnull(ls_class) then ls_class = ''
+			if pos('B.BC.BD.BE.',ls_class+'.') = 0 then
+			//<> 'B' and ls_class <> 'BD' and ls_class <> 'BC' and len(trim(ls_class)) > 0 then
+				messagebox('訊息',"此票貨物僅申請【'+ls_class_name+'】"+char(13)+char(10)+"不適用空轉空、轉口貨改郵袋、出口改航機、郵袋退運後費率")
+				parent.triggerevent('ue_clear')
+			end if
+		next
+	end if
+end if
+
+if dwo.name = 'ls_comp_id'	and ls_storage_mark = '1' then
+	if isnull(ls_hwb_no) then ls_hwb_no = ' '
+	li_cnt = 0
+	//判斷是否只試算倉租費用,若是 則計算進倉日期 至 出倉日期 之所有倉租費用 add by paula 2004/3/15
+	lb_save = parent.menuid.item[4].item[6].enabled
+	lb_delete_dtl = parent.menuid.item[4].item[7].enabled
+	if wf_imp_goods_storage(lb_save, lb_delete_dtl) <> 0 then
+		dw_master.setcolumn('ls_hwb_no')
+		return 1
+	end if
+	if dw_detail.rowcount() = 0 then
+		declare find_end_date cursor for
+		 select max(charge_sp.end_date)
+		   from charge_sp
+		  where charge_sp.cargo_location =:gs_uinfo.u_cargo_loca
+			 and charge_sp.mwb_no         =:ls_mwb_no
+			 and charge_sp.mwb_no2        =:ls_mwb_no2
+			 and charge_sp.hwb_no         =:ls_hwb_no
+			 and charge_sp.work_type      ='T'
+			 and charge_sp.storage_mark   ='Y'
+			 and charge_sp.description is null
+			 and charge_sp.status        in ('1','2')
+			 and description2 not like '轉口倉租預估收入%'
+		 ;
+		 open find_end_date ;
+		 do while true
+			fetch find_end_date into :ls_end_date ;
+			if isnull(ls_end_date) then ls_end_date = ''
+			if sqlca.sqlcode <> 0 then exit
+		 loop
+		 close find_end_date ;
+
+		 if isnull(ls_end_date) then ls_end_date = ''
+		 if ls_end_date <> '' and ls_end_date < ls_fee_date then
+			 if messagebox('訊息','此筆資料基本倉租已收費，要收取補倉租費用?',Question!,YesNo!,2) = 1 then
+				 wf_overdue_charge()	//補倉租
+			 end if
+		 elseif ls_end_date <> '' then
+			 if messagebox('訊息','此筆資料基本倉租已收費,是否要補收重量?',Question!,YesNo!,2) = 1 then
+				dw_master.setitem(1,'ls_prn_release','N')
+				wf_overdue_charge()	//補倉租
+			 end if
+		 end if
+	end if
+
+	if dw_measure.rowcount() = 0 then
+		messagebox('錯誤~','查無轉口貨物儲放資料')
+	end if
+	dw_master.setitem(1,'ls_class',ls_class)
+
+	if f_force_pay_cash(gs_uinfo.u_cargo_loca,ls_mwb_no,ls_mwb_no2,' ','T') = 'YES' then
+		//判斷是否採現金支付倉租
+//		messagebox("訊息","此票貨物已申請採現金方式支付")
+		dw_master.setitem(row,'ls_pay_type','C')
+		dw_master.setitem(row,'ls_account_no','')
+		dw_master.setitem(row,'ll_credit_vol',0)
+		dw_master.setitem(row,'ll_temp_vol',0)
+		dw_master.setitem(row,'ll_used_vol',0)
+		dw_master.setitem(row,'ls_pay_by_cash','Y')
+		ls_account_no = ''
+	end if
+	for i = 1 to dw_detail.rowcount()
+		ls_gci_date = dw_detail.getitemstring(i,'gci_date')
+		dw_detail.setitem(i, 'fee_date', ls_fee_date)
+		dw_detail.setitem(i, 'pass_pc' , dw_detail.getitemnumber(i,'pcs'))
+		dw_detail.setitem(i, 'seper_flag', ls_bank)
+		dw_detail.setitem(i, 'inc_id', ls_comp_id)
+		dw_detail.setitem(i, 'custom_id', ls_account_no)
+		dw_detail.setitem(i, 'force_flag', ls_force)
+		dw_detail.setitem(i, 'payment_type', ls_pay_type)
+		dw_detail.setitem(i, 'storage_mark', 'Y')
+		dw_detail.setitem(i, 'manual_flag', 'N')
+		dw_detail.setitem(i, 'fee_date', ls_date)
+		if not isnull(ls_cus_box_no) and len(trim(ls_cus_box_no)) > 0 then
+			dw_detail.setitem(i, 'agent_code', ls_cus_box_no)
+		else
+			dw_detail.setitem(i, 'agent_code', dw_master.getitemstring(1,'ls_box_id'))
+			ls_cus_box_no = dw_master.getitemstring(1,'ls_box_id')
+			if isnull(ls_cus_box_no) then ls_cus_box_no = ''
+		end if
+		dw_detail.setitem(i, 'prefer_flag', dw_master.getitemstring(dw_master.getrow(),'ls_prefer_flag'))
+		if ls_class = 'BD' then
+			dw_detail.setitem(i, 'special_flag', 'M') //轉口貨轉郵袋
+			dw_detail.setitem(i, 'description2', '貨轉郵倉租-承攬業~者付費')
+		elseif ls_class = 'BC' then
+			dw_detail.setitem(i, 'special_flag', 'C') //轉口貨轉郵袋
+			dw_detail.setitem(i, 'description2', '郵轉貨倉租-承攬業~者付費')
+		elseif ls_class = 'BE' then
+			dw_detail.setitem(i, 'special_flag', 'A') //轉口貨轉郵袋
+			dw_detail.setitem(i, 'description2', '轉口改標走出口改航機-承攬業~者付費')
+		else
+			dw_detail.setitem(i, 'special_flag', 'A')
+			if len(trim(ls_cus_box_no)) = 3 then
+				dw_detail.setitem(i, 'description2', '向承攬業~者收取倉租')
+			elseif len(trim(ls_cus_box_no)) = 2 then
+				dw_detail.setitem(i, 'description2', '向航空公司收取倉租')
+			end if
+		end if
+
+		ls_comp_id = ''
+		ls_title   = ''
+		ls_addr    = ''
+		ls_pay_type = ''
+		ll_credit_vol = 0
+		ll_temp_vol = 0
+		ll_used_vol = 0
+		ls_account_no = 'E'+ls_cus_box_no
+		//2003/03/17 FZ92039 進出口共用一個記帳客編  2004/1/27 進口共用同一個額度客編 credit_no
+		select inc_id      ,
+				 full_name   ,
+				 address     ,
+				 decode(payment_type_o,'C',payment_type_i,payment_type_o) payment_type,
+				 credit_vol  ,
+				 temp_vol    ,
+				 used_vol    ,
+				 combine_no  ,
+				 credit_no   ,
+				 nvl(cust_attribute,'N')
+		  into :ls_comp_id ,
+		  		 :ls_title   ,
+				 :ls_addr    ,
+				 :ls_pay_type,
+				 :ll_credit_vol,
+				 :ll_temp_vol  ,
+				 :ll_used_vol  ,
+				 :ls_combine_no,
+				 :ls_credit_no,
+				 :ls_cust_attribute
+		  from registered_customer
+		 where cargo_location =:gs_uinfo.u_cargo_loca
+			and register_no =:ls_account_no
+			and effect_date <=:ls_date
+			and cancel_date >=:ls_date ;
+
+		if isnull(ls_combine_no) then ls_combine_no = ''
+		if isnull(ls_credit_no)  then ls_credit_no = ''
+		setitem(row,'ls_cust_attr',ls_cust_attribute)
+		if len(trim(ls_combine_no)) > 0 then
+			ls_account_no = ls_combine_no
+			select inc_id     ,
+					 full_name  ,
+					 address    ,
+					 decode(payment_type_o,'C',payment_type_i,payment_type_o) payment_type,
+					 credit_vol ,
+					 temp_vol   ,
+					 used_vol   ,
+					 combine_no ,
+					 credit_no  ,
+				    nvl(cust_attribute,'N')
+			  into :ls_comp_id,
+			       :ls_title  ,
+					 :ls_addr   ,
+					 :ls_pay_type,
+					 :ll_credit_vol,
+					 :ll_temp_vol  ,
+					 :ll_used_vol  ,
+					 :ls_combine_no,
+					 :ls_credit_no	,
+					 :ls_cust_attribute
+			  from registered_customer
+			 where cargo_location =:gs_uinfo.u_cargo_loca
+				and register_no =:ls_account_no
+				and effect_date <=:ls_date
+				and cancel_date >=:ls_date
+				;
+
+			setitem(row,'ls_cust_attr',ls_cust_attribute)
+		end if
+		if isnull(ls_pay_type) then ls_pay_type = ''
+
+		if len(trim(ls_credit_no)) > 0 then //找出共用額度客編之剩餘額度
+			if ls_class = 'B' and not wf_check_agent(ls_account_no,ls_pay_type,f_get_fdate(),ls_cus_box_no) then
+				messagebox('訊息','已收費資料之承攬業~代號與輸入之資料不同,請查明後收費?')
+				parent.triggerevent('ue_clear')
+				return
+			end if
+
+			select nvl(credit_vol,0), nvl(temp_vol,0), nvl(used_vol,0), nvl(cust_attribute,'N')
+			  into :ll_credit_vol   , :ll_temp_vol   , :ll_used_vol	 , :ls_cust_attribute
+			  from registered_customer
+			 where cargo_location =:gs_uinfo.u_cargo_loca
+				and register_no    =:ls_credit_no
+				and effect_date    <=:ls_date
+				and cancel_date    >=:ls_date ;
+			if isnull(ll_credit_vol) then ll_credit_vol = 0
+   		if	isnull(ll_temp_vol) then ll_temp_vol = 0
+			if isnull(ll_used_vol)   then ll_used_vol = 0
+			setitem(row,'ls_credit_no',ls_credit_no)
+			setitem(row,'ls_cust_attr',ls_cust_attribute)
+			messagebox('訊息',"此客戶為共用"+ls_credit_no+"之信用額度")
+		end if
+
+		if isnull(ls_comp_id)  then ls_comp_id = ''
+		if isnull(ls_title)    then ls_title = ''
+		if isnull(ls_addr)     then ls_addr = ''
+		if isnull(ls_pay_type) then ls_pay_type = ''
+		if len(trim(ls_comp_id)) = 0 then
+			ls_account_no = ''
+		else
+			dw_master.setitem(row,'ls_account_no',ls_account_no)
+			dw_master.setitem(row,'ls_pay_type',ls_pay_type)
+			dw_master.setitem(row,'ll_credit_vol',ll_credit_vol)
+			dw_master.setitem(row,'ll_temp_vol',ll_temp_vol)
+			dw_master.setitem(row,'ll_used_vol',ll_used_vol)
+			dw_master.setitem(row,'ls_comp_id',ls_comp_id)
+			dw_master.setitem(row,'ls_title',ls_title)
+			dw_master.setitem(row,'ls_addr',ls_addr)
+			is_inc_id = ls_comp_id
+			if ls_cust_attribute = 'A' and f_get_fdate() >= is_credit_date then
+			else
+				if len(trim(ls_credit_no)) > 0 then
+					lb_warning = f_chk_credit_vol(gs_uinfo.u_cargo_loca,ls_credit_no,ll_warning_vol)
+				else
+					lb_warning = f_chk_credit_vol(gs_uinfo.u_cargo_loca,ls_account_no,ll_warning_vol)
+				end if
+				if ll_credit_vol + ll_temp_vol <= 0 then
+					if messagebox('訊息','信用額度 或 備用額度為零,無法使用記帳方式繳交倉租,要改以現金方式收款？',Question!,YesNo!,2) <> 1 then
+						parent.triggerevent("ue_clear")
+					else
+						setitem(row,'ls_pay_type','C')
+						setitem(row,'ls_account_no','')
+						for i = 1 to dw_detail.rowcount()
+							dw_detail.setitem(i,'payment_type','C')
+							dw_detail.setitem(i,'custom_id','')
+						next
+					end if
+				else
+					if not lb_warning then messagebox("訊息","剩餘額度:"+string(ll_credit_vol - ll_used_vol + ll_temp_vol)+" 低於警戒值:"+string(ll_warning_vol))
+				end if
+			end if
+		end if
+		li_storage_days = 0
+		li_charge_days = 0
+		ls_storage_move = dw_detail.getitemstring(i,'storage_move')
+		if isnull(ls_storage_move) then ls_storage_move = ''
+		if ls_storage_move <> 'B' then //非移倉前
+			if ls_gco_date < dw_detail.getitemstring(i,'start_date') then
+				dw_master.setitem(1, 'ls_gco_date', ls_gci_date)
+				messagebox("錯誤~","出倉日期不可小於進倉日")
+				return 1
+			else
+				dw_detail.setitem(i, 'end_date', ls_gco_date)
+			end if
+		end if
+		ls_prev_inv_no = wf_get_prev_no(i, 'T', ll_c_pre_amt, ll_c_pre_over)		//找出上一張發票或記帳單號碼
+		if isnull(ls_prev_inv_no) then ls_prev_inv_no = ''
+		if len(trim(ls_prev_inv_no)) > 0 then
+			dw_detail.setitem(i, 'prev_invoice_no', ls_prev_inv_no)
+			dw_detail.setitem(i, 'end_date', ls_gco_date)
+		end if
+
+		if ls_storage_move <> 'B' then //非移倉前
+			if len(trim(ls_gco_date)) > 0 then
+				dw_detail.setitem(i,'storage_days',daysafter(f_string2date(ls_gci_date),f_string2date(ls_gco_date)) + 1)
+			else
+				dw_detail.setitem(i,'storage_days',daysafter(f_string2date(ls_gci_date),f_string2date(ls_fee_date)) + 1)
+			end if
+		end if
+	next
+	setcolumn('ls_comp_id')
+	if len(trim(ls_pay_type)) = 0 or ls_pay_type = 'C' then
+		if len(trim(ls_account_no)) > 1 then
+			messagebox('錯誤~','付款方式不合法')
+			return -1
+		end if
+	end if
+end if
+
+if dwo.name = 'ls_account_no' or dwo.name = 'ls_fee_target' or &
+	dwo.name = 'ls_charge_type' or dwo.name = 'ls_trans_fee' or &
+	dwo.name = 'ls_bank' then
+	IF ls_storage_mark = '1' and len(trim(ls_mwb_no)) > 0 and len(trim(ls_mwb_no2)) > 0 then
+		if dw_detail.rowcount() > 0 then
+			for i = 1 to dw_detail.rowcount()
+				ls_gci_date     = dw_detail.getitemstring(i,"gci_date")
+				ls_start_date   = dw_detail.getitemstring(i,"start_date")
+				ls_charge_type  = dw_detail.getitemstring(i,"charge_type")
+				ls_airline_id   = dw_detail.getitemstring(i,'airline_id')
+				ls_flt_no       = dw_detail.getitemstring(i,'flt_no')
+				ls_flt_date     = dw_detail.getitemstring(i,'flt_date')
+
+				ls_storage_move = dw_detail.getitemstring(i,'storage_move')
+				if isnull(ls_storage_move) then ls_storage_move = ''
+
+				li_storage_days = daysafter( f_string2date(ls_start_date), f_string2date(ls_date) ) + 1
+				dw_detail.setitem(i,'seper_flag','N')
+				dw_detail.setitem(i, 'fee_date', ls_fee_date)
+				//找出上一筆之發票或計帳單號、超收差額
+				dw_detail.setitem(i,'prev_invoice_no',wf_get_prev_no(i, ls_work_type, ll_overtake_amt, ll_c_pre_over))
+				dw_detail.setitem(i,'c_pre_amt',ll_overtake_amt)
+
+				if ls_storage_move <> 'B' then //非移倉前
+					if len(trim(ls_gco_date)) > 0 then
+						dw_detail.setitem(i,'storage_days',daysafter(f_string2date(ls_gci_date),f_string2date(ls_gco_date)) + 1)
+					else
+						dw_detail.setitem(i,'storage_days',daysafter(f_string2date(ls_gci_date),f_string2date(ls_fee_date)) + 1)
+					end if
+				end if
+				li_storage_days = 0
+				li_charge_days = 0
+				if isnull(dw_detail.getitemstring(i,'overdue_flag')) or &
+					dw_detail.getitemstring(i,'overdue_flag') = 'N' or &
+					dw_detail.getitemstring(i,'overdue_flag') = '' then
+					if ls_storage_move <> 'B' then dw_detail.setitem(i, 'end_date', ls_gco_date)
+				end if
+				if isnull(dw_detail.getitemnumber(1, 'db_amt')) then
+					dw_detail.setitem(1, 'db_amt',0 )
+				end if
+			next
+			/////ponge: 因以下欄位似乎未使用，故以下省略
+			if (dwo.name='ls_trans_fee' or dwo.name='ls_bank' ) and getitemstatus(row,'ls_gco_date',primary!) = dataModified! then
+
+				cb_calc.triggerevent('clicked')
+			end if
+		else
+			 messagebox('訊息','無收費資料可供計費 !!')
+		end if
+	end if
+end if
+
+if dwo.name = 'ls_pay_type' then
+	//雜項費用
+	if ls_storage_mark = '2' then //and ( len(trim(ls_mwb_no)) > 0 or len(trim(ls_mwb_no2)) > 0) then
+		ls_airline_id = 'XXX'
+		cb_calc.enabled = false
+		dw_detail.reset()
+		ld_tax_rate   = dw_master.getitemdecimal(dw_master.getrow(),'ld_tax_rate')
+		ls_cus_box_no = dw_master.getitemstring(dw_master.getrow(),'ls_box_id')
+		if dw_detail.rowcount() = 0 then dw_detail.insertrow(0)
+		dw_master.setitem(dw_master.getrow(),'ls_force','N')
+		dw_master.setitem(dw_master.getrow(),'ls_man_release','N')
+		dw_detail.setitem(1, 'cargo_location', gs_uinfo.u_cargo_loca)		
+		dw_detail.setitem(1, 'c_select', 'Y')
+		dw_detail.setitem(1, 'mwb_no', ls_mwb_no)
+		dw_detail.setitem(1, 'mwb_no2', ls_mwb_no2)
+		dw_detail.setitem(1, 'hwb_no', ls_hwb_no)
+		dw_detail.setitem(1, 'work_type', 'T')
+		dw_detail.setitem(1, 'inc_id', ls_comp_id)
+		dw_detail.setitem(1, 'custom_id', ls_account_no)
+		dw_detail.setitem(1, 'agent_code', ls_cus_box_no)
+		dw_detail.setitem(1, 'force_flag', 'N')
+		dw_detail.setitem(1, 'manual_flag', 'N')
+		dw_detail.setitem(1, 'payment_type', ls_pay_type)
+		dw_detail.setitem(1, 'charge_type', ls_other_type)
+		dw_detail.setitem(1, 'storage_mark', 'N')		
+		dw_detail.setitem(1, 'overdue_flag', 'N')
+		dw_detail.setitem(1, 'pcs', ld_times)
+		if ls_class = 'BD' then
+			dw_detail.setitem(1, 'special_flag', 'M') //貨改郵
+		elseif ls_class = 'BC' then
+			dw_detail.setitem(1, 'special_flag', 'C') //郵改貨
+		else
+			dw_detail.setitem(1, 'special_flag', 'A')
+		end if
+   	dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)			
+//		select max(effect_date)
+//		  into :ls_effect_date
+//		  from others_rate
+//		 where cargo_location = :gs_uinfo.u_cargo_loca
+//			and charge_type = :ls_other_type
+//			and effect_date <= :ls_date ;
+//		if isnull(ls_effect_date) then ls_effect_date = ''
+//		if len(trim(ls_effect_date)) = 0 then 
+//			messagebox("訊息","找不到正確之雜項收費費率")
+//			return
+//		end if
+//		
+//		select inside_rate    , outside_rate    , unit_quantity    , min_charge    
+//		  into :ld_inside_rate, :ld_outside_rate, :li_unit_quantity, :li_min_charge
+//		  from others_rate
+//		 where cargo_location = :gs_uinfo.u_cargo_loca
+//			and charge_type    = :ls_other_type
+//			and effect_date    = :ls_effect_date
+//		 order by effect_date DESC;
+//		if ld_outside_rate <> 0 then  //設定超過計費標準,需用outside_rate
+//
+//			if ld_times > li_unit_quantity then 
+//				ll_other_amt = ld_outside_rate
+//			else				
+//				ll_other_amt = ld_inside_rate
+//			end if
+//		else
+//			ll_other_amt = round(ld_times * (ld_inside_rate / li_unit_quantity),0)
+//		end if
+//		if ll_other_amt < li_min_charge then ll_other_amt = li_min_charge
+
+	   //計算雜項收入
+		ll_other_amt = f_calc_other_fee(gs_uinfo.u_cargo_loca,'T',ls_other_type,ls_date,ls_airline_id,ls_cus_box_no,ls_comp_id,ls_account_no,ld_times, ll_over_amount, ls_return_type)
+		if ll_over_amount <> 0 then 
+			dw_detail.setitem(1,'over_amount',ll_over_amount)
+			dw_detail.setitem(1,'return_type',ls_return_type)
+			dw_detail.setitem(1,'prefer_flag','Y')
+			dw_master.setitem(dw_master.getrow(),'ls_prefer_flag','Y')
+			dw_master.setitem(dw_master.getrow(),'ls_return_type',ls_return_type)
+
+		else
+			dw_detail.setitem(1,'over_amount',0 )
+			dw_detail.setitem(1,'prefer_flag','N')
+			dw_master.setitem(dw_master.getrow(),'ls_prefer_flag','N')
+			dw_master.setitem(dw_master.getrow(),'ls_return_type','N')
+		end if
+		if isnull(dw_detail.getitemstring(1,'description3')) and dw_master.getitemstring(dw_master.getrow(),'ls_other_type') = 'R' then
+			if messagebox('訊息','此筆收費為航空公司轉口退倉回存手續費？',question!,yesno!,1) = 1 then
+				dw_detail.setitem(1,'description3','轉口貨物退倉回存儲位手續費')
+			end if
+		end if
+
+		if not isnull(getitemstring(getrow(),'ls_airline_id')) then dw_detail.setitem(1,'airline_id',dw_master.getitemstring(dw_master.getrow(),'ls_airline_id'))
+		if not isnull(getitemstring(getrow(),'ls_flt_no'))     then dw_detail.setitem(1,'flt_no',dw_master.getitemstring(dw_master.getrow(),'ls_flt_no'))
+		if not isnull(getitemstring(getrow(),'ls_flt_date'))   then dw_detail.setitem(1,'flt_date',dw_master.getitemstring(dw_master.getrow(),'ls_flt_date'))
+		if not isnull(getitemstring(getrow(),'ls_gci_date'))   then 
+			dw_detail.setitem(1,'gci_date',dw_master.getitemstring(dw_master.getrow(),'ls_gci_date'))
+		else
+			dw_detail.setitem(1,'gci_date', ls_fee_date)	
+		end if
+		dw_detail.setitem(1, 'wet', ld_times)
+		dw_detail.setitem(1, 'vol_wet', ld_times )
+		dw_detail.setitem(1, 'ar_amount', ll_other_amt )
+		dw_detail.setitem(1, 'pay_amount',ll_other_amt )
+
+
+		dw_detail.setitem(1, 'tax', round(ll_other_amt * (ld_tax_rate / 100),0 ))
+		dw_detail.setitem(1, 'db_amt',0 )
+//		dw_detail.setitem(1, 'over_amount',0 )
+		dw_detail.setitem(1, 'storage_mark', 'N')			
+		dw_detail.setitem(1, 'start_date', ls_date)	
+		dw_detail.setitem(1, 'end_date', ls_date)
+		dw_detail.setitem(1, 'fee_date', ls_fee_date)		
+		dw_detail.setitem(1, 'storage_days',0 )	
+		dw_detail.setitem(1, 'charge_days',0 )
+		dw_detail.object.start_date.protect = 0
+		dw_detail.object.end_date.protect   = 0
+		
+		ll_credit_vol = dw_master.getitemnumber(dw_master.getrow(),"ll_credit_vol")
+		ll_temp_vol   = dw_master.getitemnumber(dw_master.getrow(),"ll_temp_vol")
+		ll_used_vol   = dw_master.getitemnumber(dw_master.getrow(),"ll_used_vol")
+		ls_cust_attribute = dw_master.getitemstring(dw_master.getrow(),"ls_cust_attr")
+		if isnull(ll_credit_vol) then ll_credit_vol = 0
+		if isnull(ll_temp_vol)   then ll_temp_vol   = 0
+		if isnull(ll_used_vol)   then ll_used_vol   = 0			
+		if ls_pay_type <> 'C' and not (ls_cust_attribute = 'A' and f_get_fdate() >= is_credit_date) then
+			if ll_credit_vol + ll_temp_vol <= 0 then
+				if messagebox('訊息','信用額度 或 備用額度為零,無法使用記帳方式繳交倉租,要改以現金方式收款？',Question!,YesNo!,2) <> 1 then		
+					parent.triggerevent("ue_clear")
+				else
+					setitem(row,'ls_pay_type','C')
+					setitem(row,'ls_account_no','')
+					for i = 1 to dw_detail.rowcount()						
+						dw_detail.setitem(i,'payment_type','C')
+						dw_detail.setitem(i,'custom_id','')
+					next
+				end if
+			else
+				if ll_credit_vol + ll_temp_vol - ll_used_vol - ll_other_amt < 0 then 
+					if messagebox('訊息','剩餘額度不縛使用，將改以現金方式收款？', Information! , YesNoCancel!, 3 ) = 3 then
+						parent.triggerevent("ue_clear")
+					end if
+				end if
+			end if
+		end if	
+	END IF	
+end if
+if dwo.name = 'ls_account_no' then
+	if isnull(getitemstring(row,'ls_comp_id')) or getitemstring(row,'ls_comp_id') = '' then 
+		setitem(row,'ls_inv_type','32')
+	else
+		setitem(row,'ls_inv_type','31')		
+	end if
+end if
+end event

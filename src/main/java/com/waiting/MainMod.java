@@ -74,14 +74,14 @@ public class MainMod {
                     line = DeclareMod.doVariDecl(line);
                 }
 
-                // 訊息框
-                else if (StrUtil.containsIgnoreCase(trimLine, "messagebox")) {
-                    line = KeywordMod.doMessagebox(line, reader);
-                }
-
                 // 條件語句
                 else if (StrUtil.startWithIgnoreCase(trimLine, "if")) {
                     line = IfMod.doIf(line, reader);
+                }
+
+                // 訊息框
+                else if (StrUtil.containsIgnoreCase(trimLine, "messagebox")) {
+                    line = KeywordMod.doMessagebox(line, reader);
                 }
 
                 // 特殊運算符
