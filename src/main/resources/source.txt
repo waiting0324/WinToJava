@@ -1,1 +1,1 @@
-dw_invoice.setitem(1,'arg_desc'+string(i), trim(ls_work_name) + trim(ls_charge_desc))
+ttl_tax = round(ttl_pay_amt * (ld_tax_rate / 100),0)

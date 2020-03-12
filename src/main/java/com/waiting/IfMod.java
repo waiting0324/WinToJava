@@ -134,10 +134,16 @@ public class IfMod {
         // 有邏輯運算符情況 == > <
         else {
 
+
             Map<String, String> map = splitCondiOperator(condi);
             String logicOperator = map.get("logicOperator");
             String condiLeft = map.get("condiLeft");
             String condiRight = map.get("condiRight");
+
+            // 要求轉大寫
+            if (StrUtil.isWrap(condiLeft, "upper(", ")")) {
+                condiLeft = StrUtil.unWrap(condiLeft, "upper(", ")") + ".toUpperCase()";
+            }
 
             // 沒有運算符情況處理
             if (logicOperator == null) {

@@ -28,6 +28,7 @@ public class WinFormFunMod {
 
     // 處理Winform setitem函數 變成 屬性賦值格式
     // dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.pay_by_cash = "Y"
+    // dw_invoice.setitem(1,'arg_desc'+string(i), trim(ls_work_name) + trim(ls_charge_desc))
     public static String doSetitemToPojoType(String trimLine) {
 
         String comment = null;
@@ -41,8 +42,7 @@ public class WinFormFunMod {
         String prop = StrUtil.subBetween(trimLine.split(",")[1], "\'", "\'")
                 .replace("ls_", "").replace("li_", "")
                 .replace("ll_", "").replace("ld_", "").trim();
-        String value = StrUtil.sub(StrUtil.subAfter(trimLine, "',", true)
-                .replace("\'", "\""), 0, -1);
+        String value = StrUtil.sub(trimLine.replace("\'", "\""), trimLine.lastIndexOf(",") + 1, -1);
 
         // 如果value值要被mid函數處理
         if (StrUtil.isWrap(value, "mid(", ")")) {

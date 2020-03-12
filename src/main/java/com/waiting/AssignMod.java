@@ -83,26 +83,53 @@ public class AssignMod {
     // 特殊運算符 += ++ -=
     public static String doSpecialOperator(String line) {
 
-        if (line.contains("++")) {
+        String comment = null;
+
+        if (line.contains("//")) {
+            comment = line.split("//")[1].trim();
+            line = line.split("//")[0];
+        }
+
+        // 字串格式則不處理
+        if (line.trim().startsWith("ls_")) {
+            return line;
+        }
+        else if (line.contains("++")) {
             String param = StrUtil.subBefore(line, "++", true).trim();
-            line = StrUtil.indexedFormat("{0} = {0}.add(BigDecimal.ONE)", param);
+            if (comment == null) {
+                line = StrUtil.indexedFormat("{0} = {0}.add(BigDecimal.ONE);", param);
+            } else {
+                line = StrUtil.indexedFormat("{0} = {0}.add(BigDecimal.ONE); // {1}", param, comment);
+            }
         }
         else if (line.contains("--")) {
             String param = StrUtil.subBefore(line, "--", true).trim();
-            line = StrUtil.indexedFormat("{0} = {0}.subtract(BigDecimal.ONE)", param);
+            if (comment == null) {
+                line = StrUtil.indexedFormat("{0} = {0}.subtract(BigDecimal.ONE);", param);
+            } else {
+                line = StrUtil.indexedFormat("{0} = {0}.subtract(BigDecimal.ONE); // {1}", param, comment);
+            }
         }
         else if (line.contains("+=")) {
             String leftParam = line.split("\\+=")[0].trim();
             String func = line.split("\\+=")[1].trim();
-            line = StrUtil.indexedFormat("{0} = {0}.add({1})", leftParam, func);
+            if (comment == null) {
+                line = StrUtil.indexedFormat("{0} = {0}.add({1});", leftParam, func);
+            } else {
+                line = StrUtil.indexedFormat("{0} = {0}.add({1}); // {2}", leftParam, func, comment);
+            }
         }
         else if (line.contains("-=")) {
             String leftParam = line.split("-=")[0].trim();
             String func = line.split("-=")[1].trim();
-            line = StrUtil.indexedFormat("{0} = {0}.subtract({1})", leftParam, func);
+            if (comment == null) {
+                line = StrUtil.indexedFormat("{0} = {0}.subtract({1});", leftParam, func);
+            } else {
+                line = StrUtil.indexedFormat("{0} = {0}.subtract({1}); // {2}", leftParam, func, comment);
+            }
         }
 
-        return line + ";";
+        return line;
     }
 
     // 參數賦值
