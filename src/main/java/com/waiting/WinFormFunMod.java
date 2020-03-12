@@ -137,12 +137,12 @@ public class WinFormFunMod {
     // Winform 開始使用之前聲明的SQL語句
     public static String doOpen(String line, BufferedReader reader, Map<String, String> declareSql) throws IOException {
 
-        if (reader.readLine().trim().startsWith("DO WHILE")) {
+        if (StrUtil.startWithIgnoreCase(reader.readLine().trim(), "DO WHILE")) {
 
             StringBuilder result = new StringBuilder();
 
             // 獲取要求的SQL名稱
-            String sqlName = StrUtil.subAfter(reader.readLine(), "FETCH", false).trim();
+            String sqlName = StrUtil.subAfter(reader.readLine().toLowerCase(), "fetch", false).trim();
             // 取得之前暫存的SQL語句
             String oriSql = declareSql.get(sqlName);
 

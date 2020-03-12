@@ -1,166 +1,3 @@
-event dw_master::itemfocuschanged;string   ls_work_type, ls_mwb_no, ls_mwb_no2, ls_hwb_no, ls_charge_type, ls_status
-string   ls_airline_id, ls_flt_no, ls_flt_date, ls_other_type, ls_gci_date, ls_end_date, ls_bank
-string   ls_cus_box_no, ls_decl_no, ls_storage_mark, ls_acct_no
-string   ls_comp_id, ls_account_no, ls_force, ls_pay_type, ls_date, ls_start_date, ls_effect_date
-string   ls_title, ls_addr, ls_fee_date, ls_prev_inv_no, ls_gco_date, ls_part
-string   ls_special, ls_class , ls_class_name, ls_return_type
-string   ls_storage_move, ls_credit_no, ls_combine_no, ls_cust_attribute
-integer  i, j, li_cnt, li_unit_quantity, li_charge_days, li_storage_days, li_min_charge
-decimal  ld_times, ld_inside_rate, ld_outside_rate, ld_tax_rate, ld_act_wet, ld_charge_wet
-datetime ldt_dt
-long     ll_other_amt, ll_overtake_amt, ll_credit_vol,ll_temp_vol, ll_used_vol, ll_c_pre_amt, ll_c_pre_over, ll_cnt
-long     ll_cnt_gco, ll_warning_vol, ll_over_amount
-boolean  lb_save, lb_delete_dtl
-boolean  lb_warning
-
-ls_date         = f_get_fdate()
-ls_work_type    = getitemstring(row,"ls_work_type")
-ls_mwb_no       = getitemstring(row,"ls_mwb_no")
-ls_mwb_no2      = getitemstring(row,"ls_mwb_no2")
-ls_hwb_no       = getitemstring(row,"ls_hwb_no")
-ls_comp_id      = getitemstring(row,"ls_comp_id")
-ls_account_no   = getitemstring(row,"ls_account_no")
-ls_force        = getitemstring(row,"ls_force")
-ls_bank         = getitemstring(row,"ls_bank")
-ls_pay_type     = getitemstring(row,"ls_pay_type")
-ls_other_type   = getitemstring(row,"ls_other_type")
-ld_times        = getitemdecimal(row,"ld_times")
-ls_storage_mark = getitemstring(row,"ls_charge_type")
-ls_fee_date 	 = getitemstring(row,"ls_fee_date")
-ls_gco_date     = getitemstring(dw_master.getrow(),'ls_gco_date')
-
-if isnull(ls_mwb_no)        then ls_mwb_no  = ''
-if isnull(ls_mwb_no2)       then ls_mwb_no2 = ''
-if isnull(ls_hwb_no)        then ls_hwb_no  = ''
-if len(trim(ls_hwb_no)) = 0 then ls_hwb_no  = ' '
-if isnull(ls_bank)          then ls_bank = 'N'
-if isnull(ls_gco_date)      then ls_gco_date = ''
-
-if len(trim(ls_mwb_no)) > 0 and len(trim(ls_mwb_no2)) > 0 then
-	if dw_master.getitemstring(1,'ls_charge_type') = '2' then //雜項
-		select max(agent_code),
-			    max(data_class)
-		  into :ls_cus_box_no,
-			    :ls_class
-		  from imp_special
-		 where cargo_location =:gs_uinfo.u_cargo_loca
-			and decode(data_class,'B',old_meb_no,'BE',old_meb_no,mwb_no)    =:ls_mwb_no
-			and decode(data_class,'B',old_mwb_no2,'BE',old_mwb_no2,mwb_no2) =:ls_mwb_no2
-			and decode(data_class,'B',old_hwb_no,'BE',old_hwb_no,hwb_no)    =:ls_hwb_no
-			and data_type      ='T'
-			and data_class     in ('B','BD','BC','BE')
-			and nvl(upd_date,sysdate) in
-			(  select max(nvl(upd_date,sysdate))
-				  from imp_special
-				 where cargo_location =:gs_uinfo.u_cargo_loca
-					and decode(data_class,'B',old_meb_no,'BE',old_meb_no,mwb_no)    =:ls_mwb_no
-					and decode(data_class,'B',old_mwb_no2,'BE',old_mwb_no2,mwb_no2) =:ls_mwb_no2
-					and decode(data_class,'B',old_hwb_no,'BE',old_hwb_no,hwb_no)    =:ls_hwb_no
-					and data_type      ='T'
-					and data_class     in ('B','BD','BC','BE')
-			)
-			;
-		if isnull(ls_cus_box_no) then ls_cus_box_no = ''
-		setitem(row,'ls_class',ls_class)
-		if len(trim(ls_cus_box_no)) > 0 then
-			setitem(row,'ls_box_id',ls_cus_box_no)
-			for i = 1 to dw_detail.rowcount()
-				dw_detail.setitem(i,'agent_code',ls_cus_box_no)
-			next
-		end if
-	else
-		dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)
-		dw_measure.setfilter('')
-		dw_measure.filter()
-		for i = 1 to dw_measure.rowcount()
-			ls_airline_id = dw_measure.getitemstring(i,'airline_id')
-			ls_flt_no     = dw_measure.getitemstring(i,'flt_no')
-			ls_gci_date   = dw_measure.getitemstring(i,'gci_date')
-			select max(agent_code)
-			  into :ls_cus_box_no
-			  from imp_special
-			 where cargo_location =:gs_uinfo.u_cargo_loca
-				and mwb_no         =:ls_mwb_no
-				and mwb_no2        =:ls_mwb_no2
-				and hwb_no         =:ls_hwb_no
-				and gci_date       =:ls_gci_date
-				and data_type      ='T'
-				and data_class     in ('B','BD','BC','BE')
-				and airline_id     =:ls_airline_id
-				and flt_no         =:ls_flt_no
-				and nvl(upd_date,sysdate) in
-				(  select max(nvl(upd_date,sysdate))
-					  from imp_special
-					 where cargo_location =:gs_uinfo.u_cargo_loca
-						and mwb_no         =:ls_mwb_no
-						and mwb_no2        =:ls_mwb_no2
-						and hwb_no         =:ls_hwb_no
-						and gci_date       =:ls_gci_date
-						and data_type      ='T'
-						and data_class     in ('B','BD','BC','BE')
-						and airline_id     =:ls_airline_id
-						and flt_no         =:ls_flt_no
-				)
-				;
-			if isnull(ls_cus_box_no) then ls_cus_box_no = ''
-			if len(trim(ls_cus_box_no)) > 0 then
-				setitem(row,'ls_box_id',ls_cus_box_no)
-				for j = 1 to dw_detail.rowcount()
-					dw_detail.setitem(j,'agent_code',ls_cus_box_no)
-				next
-			end if
-
-			select data_class,
-			       decode(data_class,'B','改標','B1','整理','B2','裝配','B3','分類','B4','檢測','B5','分割','B6','重整','B7','其他','BD','貨轉郵','BC','郵轉貨','BE','出口改航機',' ')
-			  into :ls_class ,
-			       :ls_class_name
-			  from (
-			select max(data_class) data_class
-			  from imp_special
-		    where cargo_location =:gs_uinfo.u_cargo_loca
-				and mwb_no         =:ls_mwb_no
-				and mwb_no2        =:ls_mwb_no2
-				and hwb_no         =:ls_hwb_no
-				and gci_date       =:ls_gci_date
-				and data_type      ='T'
-				and airline_id     =:ls_airline_id
-				and flt_no         =:ls_flt_no
-				and (decode(data_class,'BD',mwb_no || mwb_no2,'BC',mwb_no || mwb_no2,'BE',mwb_no || mwb_no2,old_meb_no || old_mwb_no2)) is not null
-				and nvl(upd_date,sysdate) in
-				    (  select max(nvl(upd_date,sysdate))
-					      from imp_special
-	  					  where cargo_location =:gs_uinfo.u_cargo_loca
-							 and mwb_no         =:ls_mwb_no
-							 and mwb_no2        =:ls_mwb_no2
-							 and hwb_no         =:ls_hwb_no
-							 and gci_date       =:ls_gci_date
-							 and data_type      ='T'
-							 and airline_id     =:ls_airline_id
-							 and flt_no         =:ls_flt_no
-							 and (decode(data_class,'BD',mwb_no || mwb_no2,'BC',mwb_no || mwb_no2,'BE',mwb_no || mwb_no2,old_meb_no || old_mwb_no2)) is not null
-				    )
-				)
-				;
-			if isnull(ls_class) then ls_class = ''
-			if pos('B.BC.BD.BE.',ls_class+'.') = 0 then
-			//<> 'B' and ls_class <> 'BD' and ls_class <> 'BC' and len(trim(ls_class)) > 0 then
-				messagebox('訊息',"此票貨物僅申請【'+ls_class_name+'】"+char(13)+char(10)+"不適用空轉空、轉口貨改郵袋、出口改航機、郵袋退運後費率")
-				parent.triggerevent('ue_clear')
-			end if
-		next
-	end if
-end if
-
-if dwo.name = 'ls_comp_id'	and ls_storage_mark = '1' then
-	if isnull(ls_hwb_no) then ls_hwb_no = ' '
-	li_cnt = 0
-	//判斷是否只試算倉租費用,若是 則計算進倉日期 至 出倉日期 之所有倉租費用 add by paula 2004/3/15
-	lb_save = parent.menuid.item[4].item[6].enabled
-	lb_delete_dtl = parent.menuid.item[4].item[7].enabled
-	if wf_imp_goods_storage(lb_save, lb_delete_dtl) <> 0 then
-		dw_master.setcolumn('ls_hwb_no')
-		return 1
-	end if
 	if dw_detail.rowcount() = 0 then
 		declare find_end_date cursor for
 		 select max(charge_sp.end_date)
@@ -177,7 +14,8 @@ if dwo.name = 'ls_comp_id'	and ls_storage_mark = '1' then
 		 ;
 		 open find_end_date ;
 		 do while true
-			fetch find_end_date into :ls_end_date ;
+			fetch find_end_date
+			into :ls_end_date ;
 			if isnull(ls_end_date) then ls_end_date = ''
 			if sqlca.sqlcode <> 0 then exit
 		 loop
@@ -482,7 +320,7 @@ if dwo.name = 'ls_pay_type' then
 		if dw_detail.rowcount() = 0 then dw_detail.insertrow(0)
 		dw_master.setitem(dw_master.getrow(),'ls_force','N')
 		dw_master.setitem(dw_master.getrow(),'ls_man_release','N')
-		dw_detail.setitem(1, 'cargo_location', gs_uinfo.u_cargo_loca)		
+		dw_detail.setitem(1, 'cargo_location', gs_uinfo.u_cargo_loca)
 		dw_detail.setitem(1, 'c_select', 'Y')
 		dw_detail.setitem(1, 'mwb_no', ls_mwb_no)
 		dw_detail.setitem(1, 'mwb_no2', ls_mwb_no2)
@@ -495,7 +333,7 @@ if dwo.name = 'ls_pay_type' then
 		dw_detail.setitem(1, 'manual_flag', 'N')
 		dw_detail.setitem(1, 'payment_type', ls_pay_type)
 		dw_detail.setitem(1, 'charge_type', ls_other_type)
-		dw_detail.setitem(1, 'storage_mark', 'N')		
+		dw_detail.setitem(1, 'storage_mark', 'N')
 		dw_detail.setitem(1, 'overdue_flag', 'N')
 		dw_detail.setitem(1, 'pcs', ld_times)
 		if ls_class = 'BD' then
@@ -505,7 +343,7 @@ if dwo.name = 'ls_pay_type' then
 		else
 			dw_detail.setitem(1, 'special_flag', 'A')
 		end if
-   	dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)			
+   	dw_measure.retrieve(gs_uinfo.u_cargo_loca, ls_mwb_no, ls_mwb_no2, ls_hwb_no)
 //		select max(effect_date)
 //		  into :ls_effect_date
 //		  from others_rate
@@ -513,12 +351,12 @@ if dwo.name = 'ls_pay_type' then
 //			and charge_type = :ls_other_type
 //			and effect_date <= :ls_date ;
 //		if isnull(ls_effect_date) then ls_effect_date = ''
-//		if len(trim(ls_effect_date)) = 0 then 
+//		if len(trim(ls_effect_date)) = 0 then
 //			messagebox("訊息","找不到正確之雜項收費費率")
 //			return
 //		end if
-//		
-//		select inside_rate    , outside_rate    , unit_quantity    , min_charge    
+//
+//		select inside_rate    , outside_rate    , unit_quantity    , min_charge
 //		  into :ld_inside_rate, :ld_outside_rate, :li_unit_quantity, :li_min_charge
 //		  from others_rate
 //		 where cargo_location = :gs_uinfo.u_cargo_loca
@@ -527,9 +365,9 @@ if dwo.name = 'ls_pay_type' then
 //		 order by effect_date DESC;
 //		if ld_outside_rate <> 0 then  //設定超過計費標準,需用outside_rate
 //
-//			if ld_times > li_unit_quantity then 
+//			if ld_times > li_unit_quantity then
 //				ll_other_amt = ld_outside_rate
-//			else				
+//			else
 //				ll_other_amt = ld_inside_rate
 //			end if
 //		else
@@ -539,7 +377,7 @@ if dwo.name = 'ls_pay_type' then
 
 	   //計算雜項收入
 		ll_other_amt = f_calc_other_fee(gs_uinfo.u_cargo_loca,'T',ls_other_type,ls_date,ls_airline_id,ls_cus_box_no,ls_comp_id,ls_account_no,ld_times, ll_over_amount, ls_return_type)
-		if ll_over_amount <> 0 then 
+		if ll_over_amount <> 0 then
 			dw_detail.setitem(1,'over_amount',ll_over_amount)
 			dw_detail.setitem(1,'return_type',ls_return_type)
 			dw_detail.setitem(1,'prefer_flag','Y')
@@ -561,10 +399,10 @@ if dwo.name = 'ls_pay_type' then
 		if not isnull(getitemstring(getrow(),'ls_airline_id')) then dw_detail.setitem(1,'airline_id',dw_master.getitemstring(dw_master.getrow(),'ls_airline_id'))
 		if not isnull(getitemstring(getrow(),'ls_flt_no'))     then dw_detail.setitem(1,'flt_no',dw_master.getitemstring(dw_master.getrow(),'ls_flt_no'))
 		if not isnull(getitemstring(getrow(),'ls_flt_date'))   then dw_detail.setitem(1,'flt_date',dw_master.getitemstring(dw_master.getrow(),'ls_flt_date'))
-		if not isnull(getitemstring(getrow(),'ls_gci_date'))   then 
+		if not isnull(getitemstring(getrow(),'ls_gci_date'))   then
 			dw_detail.setitem(1,'gci_date',dw_master.getitemstring(dw_master.getrow(),'ls_gci_date'))
 		else
-			dw_detail.setitem(1,'gci_date', ls_fee_date)	
+			dw_detail.setitem(1,'gci_date', ls_fee_date)
 		end if
 		dw_detail.setitem(1, 'wet', ld_times)
 		dw_detail.setitem(1, 'vol_wet', ld_times )
@@ -575,49 +413,49 @@ if dwo.name = 'ls_pay_type' then
 		dw_detail.setitem(1, 'tax', round(ll_other_amt * (ld_tax_rate / 100),0 ))
 		dw_detail.setitem(1, 'db_amt',0 )
 //		dw_detail.setitem(1, 'over_amount',0 )
-		dw_detail.setitem(1, 'storage_mark', 'N')			
-		dw_detail.setitem(1, 'start_date', ls_date)	
+		dw_detail.setitem(1, 'storage_mark', 'N')
+		dw_detail.setitem(1, 'start_date', ls_date)
 		dw_detail.setitem(1, 'end_date', ls_date)
-		dw_detail.setitem(1, 'fee_date', ls_fee_date)		
-		dw_detail.setitem(1, 'storage_days',0 )	
+		dw_detail.setitem(1, 'fee_date', ls_fee_date)
+		dw_detail.setitem(1, 'storage_days',0 )
 		dw_detail.setitem(1, 'charge_days',0 )
 		dw_detail.object.start_date.protect = 0
 		dw_detail.object.end_date.protect   = 0
-		
+
 		ll_credit_vol = dw_master.getitemnumber(dw_master.getrow(),"ll_credit_vol")
 		ll_temp_vol   = dw_master.getitemnumber(dw_master.getrow(),"ll_temp_vol")
 		ll_used_vol   = dw_master.getitemnumber(dw_master.getrow(),"ll_used_vol")
 		ls_cust_attribute = dw_master.getitemstring(dw_master.getrow(),"ls_cust_attr")
 		if isnull(ll_credit_vol) then ll_credit_vol = 0
 		if isnull(ll_temp_vol)   then ll_temp_vol   = 0
-		if isnull(ll_used_vol)   then ll_used_vol   = 0			
+		if isnull(ll_used_vol)   then ll_used_vol   = 0
 		if ls_pay_type <> 'C' and not (ls_cust_attribute = 'A' and f_get_fdate() >= is_credit_date) then
 			if ll_credit_vol + ll_temp_vol <= 0 then
-				if messagebox('訊息','信用額度 或 備用額度為零,無法使用記帳方式繳交倉租,要改以現金方式收款？',Question!,YesNo!,2) <> 1 then		
+				if messagebox('訊息','信用額度 或 備用額度為零,無法使用記帳方式繳交倉租,要改以現金方式收款？',Question!,YesNo!,2) <> 1 then
 					parent.triggerevent("ue_clear")
 				else
 					setitem(row,'ls_pay_type','C')
 					setitem(row,'ls_account_no','')
-					for i = 1 to dw_detail.rowcount()						
+					for i = 1 to dw_detail.rowcount()
 						dw_detail.setitem(i,'payment_type','C')
 						dw_detail.setitem(i,'custom_id','')
 					next
 				end if
 			else
-				if ll_credit_vol + ll_temp_vol - ll_used_vol - ll_other_amt < 0 then 
+				if ll_credit_vol + ll_temp_vol - ll_used_vol - ll_other_amt < 0 then
 					if messagebox('訊息','剩餘額度不縛使用，將改以現金方式收款？', Information! , YesNoCancel!, 3 ) = 3 then
 						parent.triggerevent("ue_clear")
 					end if
 				end if
 			end if
-		end if	
-	END IF	
+		end if
+	END IF
 end if
 if dwo.name = 'ls_account_no' then
-	if isnull(getitemstring(row,'ls_comp_id')) or getitemstring(row,'ls_comp_id') = '' then 
+	if isnull(getitemstring(row,'ls_comp_id')) or getitemstring(row,'ls_comp_id') = '' then
 		setitem(row,'ls_inv_type','32')
 	else
-		setitem(row,'ls_inv_type','31')		
+		setitem(row,'ls_inv_type','31')
 	end if
 end if
 end event
