@@ -1,1 +1,4 @@
-ttl_tax = round(ttl_pay_amt * (ld_tax_rate / 100),0)
+ld_new_ttl_tax     = round(ttl_pay_amt * (ld_tax_rate/100) ,0)                  //應收金額之稅額
+ld_new_ttl_pay_tax = (ttl_pay_amt - ttl_over_amt) * (ld_tax_rate/100) //實收金額之稅額
+ttl_tax            = ld_new_ttl_tax
+ttl_amt            = (ttl_pay_amt - ttl_over_amt) + ld_new_ttl_pay_tax

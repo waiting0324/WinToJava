@@ -1,5 +1,6 @@
 package com.waiting;
 
+import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.math.BigDecimal;
@@ -170,38 +171,9 @@ public class AssignMod {
         else if (StrUtil.isWrap(func, "\'")) {
             func = func.replace("\'", "\"");
         }
-        // 簡單加減乘除計算  ll_ar_amt - ll_ar_recv_amt
-        else if (StrUtil.count(func, "-") == 1 || StrUtil.count(func, "+") == 1
-                || StrUtil.count(func, "*") == 1 || StrUtil.count(func, "/") == 1) {
-            String operator = "";
-            String[] params = null;
-            if (func.contains("-")) {
-                operator = "subtract";
-                params = func.split("-");
-            } else if (func.contains("+")) {
-                operator = "add";
-                params = func.split("\\+");
-            } else if (func.contains("*")) {
-                operator = "multiply";
-                params = func.split("\\*");
-            } else if (func.contains("/")) {
-                operator = "divide";
-                params = func.split("/");
-            }
-            StrUtil.trim(params);
-
-            // 處理POJO類 dw_error.cargo_location
-            for (int i = 0; i < params.length; i++) {
-                String param = params[i];
-                if (param.contains(".")) {
-                    List<String> split = StrUtil.splitTrim(param, ".");
-                    String pojo = split.get(0);
-                    String prop = split.get(1);
-                    params[i] = pojo + "." + StrUtil.genGetter(StrUtil.toCamelCase(prop)) + "()";
-                }
-            }
-
-            func = StrUtil.format("{}.{}({})", params[0], operator, params[1]);
+        // 加減乘除計算  ll_ar_amt - ll_ar_recv_amt
+        else if (StrUtil.containsAny(func, "+", "-", "*", "/")) {
+            func = doCalc(func);
         }
         // 取MOD計算  mod(li_i,3) //除以3之餘數
         else if (func.startsWith("mod")) {
@@ -249,6 +221,64 @@ public class AssignMod {
             return StrUtil.format("{} = {};", leftParam, func);
         }
 
+    }
+
+    // 處理加、減、乘、除計算
+    public static String doCalc(String func) {
+      /*  String operator = "";
+        String[] params = null;*/
+
+        // 第一個碰到的運算符
+        String operator = StrUtil.getContainsStr(func, "+", "-", "*", "/");
+
+        if (operator != null) {
+
+            // 是否有被括號包住
+            boolean isWrap = false;
+            if (StrUtil.isWrap(func, "(", ")")) {
+                func = StrUtil.unWrap(func, "(", ")");
+                isWrap = true;
+            }
+
+            // 第一個運算符 前、後 的運算式
+            String funcBefore = StrUtil.subBefore(func, operator, false).trim();
+            String funcAfter = StrUtil.subAfter(func, operator, false).trim();
+
+            // 遞迴封裝運算式
+            if ("*".equals(operator)) {
+                if (isWrap) {
+                    func = StrUtil.format("({}.multiply({}))", doCalc(funcBefore), doCalc(funcAfter));
+                } else {
+                    func = StrUtil.format("{}.multiply({})", doCalc(funcBefore), doCalc(funcAfter));
+                }
+            } else if ("+".equals(operator)) {
+                if (isWrap) {
+                    func = StrUtil.format("({}.add({}))", doCalc(funcBefore), doCalc(funcAfter));
+                } else {
+                    func = StrUtil.format("{}.add({})", doCalc(funcBefore), doCalc(funcAfter));
+                }
+            } else if ("-".equals(operator)) {
+                if (isWrap) {
+                    func = StrUtil.format("({}.subtract({}))", doCalc(funcBefore), doCalc(funcAfter));
+                } else {
+                    func = StrUtil.format("{}.subtract({})", doCalc(funcBefore), doCalc(funcAfter));
+                }
+            } else if ("/".equals(operator)) {
+                if (isWrap) {
+                    func = StrUtil.format("({}.divide({}))", doCalc(funcBefore), doCalc(funcAfter));
+                } else {
+                    func = StrUtil.format("{}.divide({})", doCalc(funcBefore), doCalc(funcAfter));
+                }
+            }
+
+        } else {
+            // 如果是純數字，則用大數字進行封裝
+            if (NumberUtil.isNumber(func)) {
+                func = StrUtil.format("new BigDecimal({})", func);
+            }
+        }
+
+        return func;
     }
 
     // 擷取字串 substr(ls_valid_account,li_i,1)
