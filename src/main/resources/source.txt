@@ -1,18 +1,3 @@
-if (ttl_over_without_tax <> 0 and ls_payment_type = 'C') or (ttl_over_without_tax <> 0 and ls_inv_tax_adjust = 'Y') then
-	dw_invoice.setitem(1 ,'memo8','折讓：'+string(ttl_over_without_tax,"###,###,###"))  //寫於發票備註8
-	ttl_pay_amt -= ttl_over_without_tax
-	dw_invoice.setitem(1,'ttl_pay_amt', ttl_pay_amt)
-	ttl_tax = ttl_pay_tax
-	dw_invoice.setitem(1,'ttl_tax', ttl_tax)	//稅額
-	dw_invoice.setitem(1,'ttl_amt', ttl_pay_amt + ttl_tax)
-end if
-
-//金額大寫轉換
-nt_dollar = ''
-for i = 1 to 8
-	nt_dollar_temp = f_amt_in_words(mid(string(ttl_pay_amt + ttl_tax, '00000000'),i,1))
-	nt_dollar = trim(nt_dollar) + trim(nt_dollar_temp)		
-next
 dw_invoice.setitem(1,'c_amt1',mid(nt_dollar,1,2))
 dw_invoice.setitem(1,'c_amt2',mid(nt_dollar,3,2))
 dw_invoice.setitem(1,'c_amt3',mid(nt_dollar,5,2))

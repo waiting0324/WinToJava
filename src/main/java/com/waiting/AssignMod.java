@@ -53,8 +53,8 @@ public class AssignMod {
         }
 
 
-        // 處理值
-        if (value.contains(".")) {
+        // 處理值，沒有被mid函數處理
+        if (value.contains(".") && !value.contains("StringUtils.mid")) {
             String valPojo = value.split("\\.")[0];
             String valProp = value.split("\\.")[1];
             value = StrUtil.format("{}.{}()", valPojo, StrUtil.genGetter(StrUtil.toCamelCase(valProp)));
@@ -182,7 +182,7 @@ public class AssignMod {
             func = StrUtil.format("new BigDecimal({}.intValue() % {})", split[0], split[1]);
         }
         // 擷取字串
-        else if (StrUtil.startWithAny(func, "substr", "mid")) {
+        else if (StrUtil.startWithAny(func, "substr")) {
             func = doSubStr(func);
         }
         // pojo 取值計算   ls_cargo = dw_error.cargo_location
@@ -225,19 +225,25 @@ public class AssignMod {
     }
 
     // 擷取字串 substr(ls_valid_account,li_i,1)
-    static String doSubStr(String func) {
-        func = func.replace("mid", "substr");
+    public static String doSubStr(String func) {
+//        func = func.replace("mid", "substr");
         String[] split = StrUtil.unWrap(func, "substr(", ")").split(",");
-        // ls_id = substr(ls_valid_account,li_i,1)
-        /*if (split[1].contains("_")) {
-            func = StrUtil.format("{}.subString({}.intValue()-1, {}.intValue() + {}))", split[0], split[1], split[1], Integer.parseInt(split[2])-2);
-        } else {*/
-            if (split.length > 2) {
-                func = StrUtil.format("{}.substring({}, {}); //TODO 更改位置", split[0], split[1], split[2]);
-            } else {
-                func = StrUtil.format("{}.substring(0, {}); //TODO 更改位置", split[0], split[1]);
-            }
-        //}
+
+        if (split.length > 2) {
+            func = StrUtil.format("{}.substring({}, {}); //TODO 更改位置", split[0], split[1], split[2]);
+        } else {
+            func = StrUtil.format("{}.substring(0, {}); //TODO 更改位置", split[0], split[1]);
+        }
+
         return func;
+    }
+
+    // mid(nt_dollar,1,2)
+    public static String doMid(String line) {
+        String param = StrUtil.subBetween(line, "mid(", ",").trim();
+        String num1 = StrUtil.subBetween(line, ",", ",").trim();
+        String num2 = StrUtil.sub(line, line.lastIndexOf(",")+1, -1);
+
+        return  StrUtil.format("StringUtils.mid({}, {}, {})", param, Integer.parseInt(num1)-1, num2);
     }
 }

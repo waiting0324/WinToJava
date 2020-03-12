@@ -15,6 +15,14 @@ public class ForMod {
             String listName = StrUtil.subBetween(line, "to", ".").trim();
             return StrUtil.format("for ({} : {}) {", listName, listName + "s");
         }
-        return line;
+        // 普通for循環 for i = 1 to 8
+        else {
+            String param = StrUtil.subBetween(line, "for", "=").trim();
+            String num1 = StrUtil.subBetween(line, "=", "to").trim();
+            String num2 = StrUtil.subAfter(line, "to", true).trim();
+
+            return StrUtil.format("for (int {} = {}; {} <= {}; {}++) {", param, num1, param, num2, param);
+        }
+
     }
 }

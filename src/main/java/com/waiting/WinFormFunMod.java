@@ -44,6 +44,11 @@ public class WinFormFunMod {
         String value = StrUtil.sub(StrUtil.subAfter(trimLine, "',", true)
                 .replace("\'", "\""), 0, -1);
 
+        // 如果value值要被mid函數處理
+        if (StrUtil.isWrap(value, "mid(", ")")) {
+            value = AssignMod.doMid(value);
+        }
+
         if (comment == null) {
             trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);
         } else {
