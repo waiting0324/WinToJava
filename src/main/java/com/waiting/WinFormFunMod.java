@@ -48,6 +48,10 @@ public class WinFormFunMod {
         if (StrUtil.isWrap(value, "mid(", ")")) {
             value = AssignMod.doMid(value);
         }
+        // 如果value值需要進行運算
+        if (StrUtil.containsAny(value, "+", "-", "*", "/")) {
+            value = AssignMod.doCalc(value);
+        }
 
         if (comment == null) {
             trimLine = StrUtil.format("{}.{} = {}", pojo, prop, value);

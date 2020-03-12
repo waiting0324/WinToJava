@@ -54,8 +54,8 @@ public class AssignMod {
         }
 
 
-        // 處理值，沒有被mid函數處理
-        if (value.contains(".") && !value.contains("StringUtils.mid")) {
+        // 處理值，沒有被各種函數處理
+        if (value.contains(".") && !StrUtil.containsAny(value, "StringUtils.mid", ".add", ".subtract", ".multiply", ".divide")) {
             String valPojo = value.split("\\.")[0];
             String valProp = value.split("\\.")[1];
             value = StrUtil.format("{}.{}()", valPojo, StrUtil.genGetter(StrUtil.toCamelCase(valProp)));
@@ -139,11 +139,12 @@ public class AssignMod {
         if (StrUtil.isBlank(line)) return "";
         if (line.contains("return")) return line;
 
-
+        // 基本屬性分離
         String leftParam = line.split("=")[0].trim();
         String func = StrUtil.subBefore(line.split("=")[1], "//", true).trim();
         String comment = StrUtil.subAfter(line, "//", true);
 
+        // Winform getitem函數處理
         if (func.contains(".getitem")) {
             func = func.replace("\'", "\"");
             String pojo = func.split("\\.")[0];
@@ -225,8 +226,6 @@ public class AssignMod {
 
     // 處理加、減、乘、除計算
     public static String doCalc(String func) {
-      /*  String operator = "";
-        String[] params = null;*/
 
         // 第一個碰到的運算符
         String operator = StrUtil.getContainsStr(func, "+", "-", "*", "/");
