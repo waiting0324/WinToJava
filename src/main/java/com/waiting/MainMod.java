@@ -131,8 +131,8 @@ public class MainMod {
                 }
 
                 // switch處理
-                else if (StrUtil.startWithAny(trimLine, "CHOOSE", "CASE", "END CHOOSE")) {
-                    line = SwitchMod.doSwitch(line);
+                else if (StrUtil.startWithAny(trimLine.toLowerCase(), "choose", "case", "end choose")) {
+                    line = SwitchMod.doSwitch(line.toLowerCase());
                 }
 
                 // Winform內置 dw_master情況

@@ -116,6 +116,8 @@ public class KeywordMod {
             // return 0 則表示成功
             if (Integer.parseInt(line) == 0) {
                 result.append("return new TransactionData(true, \"\", ResultEnum.SUCCESS, null, null);");
+            } else {
+                result.append("// TODO 處理返回結果 return " + line);
             }
         }
         // 返回JSON則標注待處理
