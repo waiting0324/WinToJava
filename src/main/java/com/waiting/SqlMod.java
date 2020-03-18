@@ -1,6 +1,5 @@
 package com.waiting;
 
-import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.BufferedReader;
@@ -374,8 +373,11 @@ public class SqlMod {
         }
         // 查詢結果僅有一筆
         else {
-            result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
-            result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");
+            /*result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
+            result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");*/
+            result.append("resultMap = new HashMap<>();\n" +
+                    "if (resultList.size() > 1) return commonService.returnSqlError(request, sql);\n" +
+                    "if (resultList.size() == 1) resultMap = resultList.get(0);\n");
         }
 
 
@@ -433,8 +435,10 @@ public class SqlMod {
         // 請求參數映射  param.put("ls_virtual_account", ls_virtual_account);
         if (params.size() != 0) {
             result += "param = new HashMap(); \n";
+            int i = 0;
             for (String param : params) {
-                result = result + "param.put(\"" + param + "\", " + param + ");\n";
+                result = result + "query.setParameter(" + (i+1) + ", chargeSp." + StrUtil.genGetter(StrUtil.toCamelCase(param)) + "() == null ? \"\" : chargeSp." + StrUtil.genGetter(StrUtil.toCamelCase(param)) + "());\n";
+                i++;
             }
         }
 

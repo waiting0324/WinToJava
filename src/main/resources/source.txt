@@ -1,86 +1,112 @@
-choose case dwo.name
-	case 'ls_mwb_no2'		
- 		 messagebox('錯誤~','主號檢查碼邏輯錯誤~,請檢查後再收費')
-		 setitem(row,'ls_mwb_no2','')
-		 return 1
-	case 'ls_comp_id'
-		if f_chk_idno(data) <> 0 then 
-			messagebox('錯誤~', '統一編號檢查碼輸入錯誤~')
-			setitem(row,'ls_comp_id','')
-			return 1
-		end if	
-		select full_name    , address    , nvl(delete_mark,'N')
-		  into :ls_full_name, :ls_address, :ls_delete_mark
-		  from customer
-		 where inc_id = :data;
-		if isnull(ls_full_name) then ls_full_name = ''
-		if len(trim(ls_full_name)) = 0 then 
-			messagebox('訊息','查無此客戶資料')
-			setitem(row,'ls_comp_id','')
-			return 1
-		end if
-		if isnull(ls_delete_mark) then ls_delete_mark = ''
-		if trim(ls_delete_mark) = 'Y' then
-			messagebox('錯誤~', '此客戶統一編號已被註銷')
-			setitem(row,'ls_comp_id','')
-			return 1
-		end if
-	case "ls_title"
-		if isnull(data) then data = ''
-		if pos(data,'\') > 0 or pos(data,'"') > 0 then
-		   messagebox("訊息",'開立發票公司全銜有特殊字元[\或是"]請刪除')
-			return 1
-		end if
-		
-	case 'ls_return_type'		
-		messagebox('錯誤~', '優退方式只能為線上或後退')
-		return 1
-	case 'ls_prefer_flag'
-		messagebox('錯誤~', '優惠方案只能修改為個案')
-		return 1		
-	case 'ls_other_type'
-		return 1
-	case 'ls_trans_fee'
-		messagebox('錯誤~', '轉運費率只能輸入 Y 或 N')
-		return 1
-	case 'ls_gco_date'
-		if isnull(data) then data = ''
-		if f_chk_fdate(data) <> 0 or len(trim(data)) = 0 then
-			messagebox('錯誤~', '輸入之出倉日期無效')
-		else
-			messagebox('錯誤~', '出倉日期不可小於進倉日期')
-		end if
-		return 1
-	case 'ls_account_no'
-		ls_mwb_no  = getitemstring(1,'ls_mwb_no')
-		ls_mwb_no2 = getitemstring(1,'ls_mwb_no2')
-		ls_hwb_no  = getitemstring(1,'ls_hwb_no')
-		if isnull(ls_hwb_no)        then ls_hwb_no = ''
-		if len(trim(ls_hwb_no)) = 0 then ls_hwb_no = ' '
-		if getitemstring(row,'ls_charge_type') = '1' and f_force_pay_cash(gs_uinfo.u_cargo_loca,ls_mwb_no,ls_mwb_no2,ls_hwb_no,'T') = 'YES' then
-			messagebox("訊息","此票貨物已申請現金方式支付倉租，"+char(13)+char(10)+"不可輸入記帳客編【"+data+"】")
-		else
-			select inc_id      , 
-					 cust_attribute
-			  into :ls_inc_id    ,
-					 :ls_cust_attribute
-			  from registered_customer
-			 where cargo_location =:gs_uinfo.u_cargo_loca
-				and register_no = :data
-				and effect_date <= to_char(sysdate,'yyyymmdd')
-				and cancel_date >= to_char(sysdate,'yyyymmdd') ;
-			if isnull(ls_inc_id) then ls_inc_id = ''
-			if isnull(ls_cust_attribute) then ls_cust_attribute = ''
-			if ls_cust_attribute = 'A' then 
-				if getitemstring(row,'ls_charge_type') = '1' then messagebox('錯誤~','航空公司轉口倉租不可使用線上收費!!')
-			end if
-			if len(trim(ls_inc_id)) = 0 then messagebox('訊息','記帳客戶錯誤~或已過期!!')
-		end if
+
+  SELECT IMP_GOODS_STORAGE.GCI_DATE,   
+         IMP_GOODS_STORAGE.AIRLINE_ID,   
+         IMP_GOODS_STORAGE.FLT_DATE,   
+         IMP_GOODS_STORAGE.FLT_NO,     
+         IMP_GOODS_STORAGE.FLT_TIME,  
+			IMP_GOODS_STORAGE.DATA_CLASS,
+         IMP_GOODS_STORAGE.CHARGE_TYPE,  
+			IMP_GOODS_STORAGE.AGENT_CODE,
+			IMP_GOODS_STORAGE.ACT_PCS,  
+         IMP_GOODS_STORAGE.PCS,   
+         IMP_GOODS_STORAGE.WET,   
+         IMP_GOODS_STORAGE.VOL_WET
+         into :ls_gci_date,
+                  :ls_airline_id,
+                  :ls_flt_date,
+                  :ls_flt_no,
+                  :li_flt_time,
+         			:ls_data_class,
+                  :ls_charge_type,
+         			:ls_agent_code,
+         			:ll_act_pcs,
+                  :ll_pcs,
+                  :ld_wet,
+                  :ld_vol_wet
+    FROM (	 
+  SELECT IMP_GOODS_STORAGE.GCI_DATE,   
+         IMP_GOODS_STORAGE.AIRLINE_ID,   
+         IMP_GOODS_STORAGE.FLT_DATE,   
+         IMP_GOODS_STORAGE.FLT_NO,     
+         IMP_GOODS_STORAGE.FLT_TIME,  
+			IMP_SPECIAL.DATA_CLASS,
+         DECODE(IMP_SPECIAL.DATA_CLASS,'BD','ML','BC','ML',IMP_WORK_AREA.CHARGE_TYPE) CHARGE_TYPE,  
+			IMP_SPECIAL.AGENT_CODE,
+			IMP_GOODS_IN.ACT_PCS,  
+         sum(nvl(IMP_GOODS_STORAGE.PCS,0)) PCS,   
+         sum(nvl(IMP_GOODS_STORAGE.WET,0)) WET,   
+         sum(nvl(IMP_GOODS_STORAGE.VOL_WET,0)) VOL_WET  
+    FROM IMP_GOODS_STORAGE,
+			IMP_GOODS_IN,
+			IMP_WORK_AREA,
+			(
+			  SELECT IMP_SPECIAL.CARGO_LOCATION,
+			         IMP_SPECIAL.MWB_NO,
+			         IMP_SPECIAL.MWB_NO2,
+			         IMP_SPECIAL.HWB_NO,
+			         IMP_SPECIAL.GCI_DATE,
+			         IMP_SPECIAL.AIRLINE_ID,
+			         IMP_SPECIAL.FLT_NO,
+			         IMP_SPECIAL.FLT_DATE,
+						IMP_SPECIAL.DATA_TYPE,
+						IMP_SPECIAL.DATA_CLASS,
+						MAX(IMP_SPECIAL.AGENT_CODE) AGENT_CODE
+				 FROM IMP_SPECIAL
+				WHERE IMP_SPECIAL.CARGO_LOCATION = :gs_uinfo.u_cargo_loca
+			     AND IMP_SPECIAL.MWB_NO         = :ls_mwb_no
+			     AND IMP_SPECIAL.MWB_NO2        = :ls_mwb_no2
+			     AND IMP_SPECIAL.HWB_NO         = :ls_hwb_no
+				  AND IMP_SPECIAL.DATA_TYPE      = 'T' 
+	           AND IMP_SPECIAL.DATA_CLASS in ('B','BD','BC','BE')
+			GROUP BY IMP_SPECIAL.CARGO_LOCATION,
+			         IMP_SPECIAL.MWB_NO,
+			         IMP_SPECIAL.MWB_NO2,
+			         IMP_SPECIAL.HWB_NO,
+			         IMP_SPECIAL.GCI_DATE,
+			         IMP_SPECIAL.AIRLINE_ID,
+			         IMP_SPECIAL.FLT_NO,
+			         IMP_SPECIAL.FLT_DATE,
+						IMP_SPECIAL.DATA_TYPE,
+						IMP_SPECIAL.DATA_CLASS						
+			) IMP_SPECIAL
+   WHERE IMP_GOODS_STORAGE.cargo_location =:gs_uinfo.u_cargo_loca
+	  and IMP_GOODS_STORAGE.mwb_no    =:ls_mwb_no
+	  and IMP_GOODS_STORAGE.mwb_no2   =:ls_mwb_no2
+	  and IMP_GOODS_STORAGE.hwb_no    =:ls_hwb_no
+	  and IMP_GOODS_STORAGE.DATA_TYPE = 'T'
+	  and IMP_GOODS_STORAGE.PCS       > 0
+	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_GOODS_IN.CARGO_LOCATION
+	  and IMP_GOODS_STORAGE.MWB_NO         = IMP_GOODS_IN.MWB_NO
+	  and IMP_GOODS_STORAGE.MWB_NO2        = IMP_GOODS_IN.MWB_NO2
+	  and IMP_GOODS_STORAGE.HWB_NO         = IMP_GOODS_IN.HWB_NO
+	  and IMP_GOODS_STORAGE.GCI_DATE       = IMP_GOODS_IN.GCI_DATE
+	  and IMP_GOODS_STORAGE.AIRLINE_ID     = IMP_GOODS_IN.AIRLINE_ID
+	  and IMP_GOODS_STORAGE.FLT_NO         = IMP_GOODS_IN.FLT_NO
+	  and IMP_GOODS_STORAGE.FLT_DATE       = IMP_GOODS_IN.FLT_DATE
+	  and IMP_GOODS_STORAGE.DATA_TYPE      = IMP_GOODS_IN.DATA_TYPE	  
+	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_SPECIAL.CARGO_LOCATION
+	  and IMP_GOODS_STORAGE.MWB_NO         = IMP_SPECIAL.MWB_NO
+	  and IMP_GOODS_STORAGE.MWB_NO2        = IMP_SPECIAL.MWB_NO2
+	  and IMP_GOODS_STORAGE.HWB_NO         = IMP_SPECIAL.HWB_NO
+	  and IMP_GOODS_STORAGE.GCI_DATE       = IMP_SPECIAL.GCI_DATE
+	  and IMP_GOODS_STORAGE.AIRLINE_ID     = IMP_SPECIAL.AIRLINE_ID
+	  and IMP_GOODS_STORAGE.FLT_NO         = IMP_SPECIAL.FLT_NO
+	  and IMP_GOODS_STORAGE.FLT_DATE       = IMP_SPECIAL.FLT_DATE
+	  and IMP_GOODS_STORAGE.DATA_TYPE      = IMP_SPECIAL.DATA_TYPE	 
+	  and IMP_GOODS_IN.ACT_PCS > 0  
+     and IMP_GOODS_IN.ACT_WET > 0 
+	  and IMP_GOODS_STORAGE.CARGO_LOCATION = IMP_WORK_AREA.CARGO_LOCATION (+)
+     and IMP_GOODS_STORAGE.DATA_TYPE      = IMP_WORK_AREA.DATA_TYPE (+)
+     and IMP_GOODS_STORAGE.LOCATION       = IMP_WORK_AREA.LOCATION (+) 
+GROUP BY IMP_GOODS_STORAGE.GCI_DATE,   
+         IMP_GOODS_STORAGE.AIRLINE_ID,   
+         IMP_GOODS_STORAGE.FLT_DATE,   
+         IMP_GOODS_STORAGE.FLT_NO,   
+         IMP_GOODS_STORAGE.FLT_TIME,  
+			IMP_SPECIAL.DATA_CLASS, 
+         DECODE(IMP_SPECIAL.DATA_CLASS,'BD','ML','BC','ML',IMP_WORK_AREA.CHARGE_TYPE),
+			IMP_SPECIAL.AGENT_CODE,
+			IMP_GOODS_IN.ACT_PCS
+		 ) IMP_GOODS_STORAGE
+;
 			
-		setitem(row,'ls_account_no','')
-		setitem(row,'ls_pay_type','C')
-		setitem(row,'ls_comp_id','')
-		return 1
-	case 'ls_box_id'		
-	   messagebox('錯誤~','承攬業~或航空公司代號錯誤~!!')
-		return 1
