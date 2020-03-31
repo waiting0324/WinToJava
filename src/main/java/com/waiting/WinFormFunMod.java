@@ -151,7 +151,7 @@ public class WinFormFunMod {
             while (true) {
                 line = reader.readLine();
                 if (line.contains(";")) {
-                    if (!line.replace(";", "").isBlank()) intoSql.append(line.replace(";", "") + "\n");
+                    if (!StrUtil.isBlank(line.replace(";", ""))) intoSql.append(line.replace(";", "") + "\n");
                     break;
                 }
                 intoSql.append(line + "\n");

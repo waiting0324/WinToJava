@@ -101,7 +101,14 @@ public class IfMod {
         condi = condi.trim();
 
         // 條件判斷是否為空(沒有邏輯運算符) isnull(ls_register_no) 、 dw_criteria.tran_date_s is null
-        if (condi.startsWith("isnull") || StrUtil.endWith(condi.trim(), "is null")) {
+        if (condi.startsWith("isnull") || StrUtil.endWith(condi.trim(), "is null") || condi.startsWith("!isnull")) {
+
+            boolean isNot = false;
+
+            if (condi.startsWith("!")) {
+                condi = StrUtil.subAfter(condi, "!", false);
+                isNot = true;
+            }
 
             String param = "";
 
@@ -114,9 +121,14 @@ public class IfMod {
                 param = StrUtil.subBefore(condi, "is", false).trim();
             }
 
+            // master
+            if (param.startsWith("getitem")) {
+                param = WinFormFunMod.doGetitemstring(param, false);
+            }
+
             // 處理Winform getitem函數 變成 屬性格式
             // dw_detail.getitemstring(i,'overdue_flag') → dw_detail.overdue_flag
-            if (param.contains(".getitem")) {
+            else if (param.contains(".getitem")) {
                 param = param.replace("\"", "\'");
                 param = WinFormFunMod.doGetitemToPojoType(param);
             }
@@ -129,7 +141,11 @@ public class IfMod {
             }
 
             // 轉換結果
-            condi = param + " == null";
+            if (isNot) {
+                condi = param + " != null";
+            } else  {
+                condi = param + " == null";
+            }
         }
         // 有邏輯運算符情況 == > <
         else {
@@ -164,12 +180,20 @@ public class IfMod {
                 condiLeft = WinFormFunMod.doGetitemToPojoType(condiLeft);
             }
 
+            if (condiRight.startsWith("getitemstring")) {
+                /*condiRight = WinFormFunMod.doGetitemstring(condiRight, false);
+                condiRight = StrUtil.format("{}.{}()",
+                        condiRight.split("\\.")[0],
+                        StrUtil.genGetter(StrUtil.toCamelCase(condiRight.split("\\.")[1])));*/
+                condiRight = WinFormFunMod.doGetitemstring(condiRight, true);
+            }
+
             // 字串長度處理 len(trim(ls_close_flag)) 可進行 + - * / 運算
             if (condiLeft.startsWith("len(")) {
                 condiLeft = tranIfLenTrimParas(condiLeft);
             }
             // 比較字串是否相等 ls_close_flag != "A"
-            else if (condiLeft.startsWith("ls_")){
+            else if (condiLeft.startsWith("ls_") || "data".equals(condiLeft)){
 
                 if ("=".equals(logicOperator) || "==".equals(logicOperator)) {
                     return StrUtil.format("{}.equals({})", condiRight, condiLeft);
@@ -284,6 +308,7 @@ public class IfMod {
 
         // 處理Winform函數 dw_master.setitem(row,'ls_pay_by_cash','Y') → dw_master.setPayByCash("Y")
         if (func.contains("setitem")) {
+            if (!func.contains(".setitem")) func = "dw_master." + func;
             func = func.replace("\"", "\'");
             func = WinFormFunMod.doSetitemToPojoType(func);
         }

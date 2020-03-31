@@ -373,7 +373,7 @@ public class SqlMod {
         }
         // 查詢結果僅有一筆
         else {
-            result.append("if (resultList.size() != 1)  return new TransactionData(false, \"\", FeeResultEnum.FE02_E140, null, new Object[]{sql});\n");
+            result.append("if (resultList.size() != 1)  commonService.returnSqlError(request, sql);\n");
             result.append("resultMap = (Map<String, Object>) resultList.get(0);\n");
         }
 

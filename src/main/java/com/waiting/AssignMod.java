@@ -3,8 +3,6 @@ package com.waiting;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.StrUtil;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -30,7 +28,8 @@ public class AssignMod {
             return WinFormFunMod.doReset(trimLine);
         }
         // Winform的protect屬性，用於設為唯獨
-        else if (trimLine.contains(".protect") || trimLine.contains(".setfilter") || trimLine.contains(".filter") || trimLine.contains(".setcolumn") ) {
+        else if (trimLine.contains(".protect") || trimLine.contains(".setfilter") || trimLine.contains(".filter")
+                || trimLine.contains(".setcolumn") || trimLine.contains(".setfocus") ) {
             return WinFormFunMod.doProtect(trimLine);
         }
 
